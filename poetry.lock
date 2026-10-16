@@ -512,25 +512,6 @@ gcp-secret-manager = ["google-cloud-secret-manager (>=2.23.1)"]
 yaml = ["pyyaml (>=6.0.1)"]
 
 [[package]]
-name = "pydentic"
-version = "0.0.1.dev3"
-description = "Pydantic Identifiers"
-optional = false
-python-versions = ">=3.6.1"
-groups = ["main"]
-files = [
-    {file = "pydentic-0.0.1.dev3-py3-none-any.whl", hash = "sha256:b37f690f262e02e781deae8588a411c596489bc2837701fbb5e8c59b31b4236e"},
-    {file = "pydentic-0.0.1.dev3.tar.gz", hash = "sha256:4c5ee9c260e3cbcdb2a2d725b1d98046cb2b5298e6d6154449a685cf4cca85ec"},
-]
-
-[package.dependencies]
-python-stdnum = ">=1.16"
-
-[package.extras]
-dev = ["flake8"]
-test = ["pydantic", "pytest"]
-
-[[package]]
 name = "python-dotenv"
 version = "1.2.4"
 description = "Read key-value pairs from a .env file and set them as environment variables"
@@ -544,21 +525,6 @@ files = [
 
 [package.extras]
 cli = ["click (>=5.0)"]
-
-[[package]]
-name = "python-stdnum"
-version = "2.2"
-description = "Python module to handle standardized numbers and codes"
-optional = false
-python-versions = ">=3.8"
-groups = ["main"]
-files = [
-    {file = "python_stdnum-2.2-py3-none-any.whl", hash = "sha256:bdf98fd117a0ca152e4047aa8ad254bae63853d4e915ddd4e0effb33ba0e9260"},
-    {file = "python_stdnum-2.2.tar.gz", hash = "sha256:e95fcfa858a703d4a40130cb3eaac133c60d8808a7f3c98efeedac968c2479b9"},
-]
-
-[package.extras]
-soap = ["zeep"]
 
 [[package]]
 name = "sqlalchemy"
@@ -721,4 +687,4 @@ typing-extensions = ">=4.15.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "c1291612a2d3b94c101d90c054a812898154fd19b0377ba2cd41f4705b5e7aa0"
+content-hash = "bedd630194049e136ec6baff96a225b636a5c339c508ae21cead89d7bd34a9a0"
