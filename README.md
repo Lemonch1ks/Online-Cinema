@@ -1,3 +1,42 @@
+## Быстрый старт
+
+Нужны Python 3.14 и [Poetry](https://python-poetry.org/).
+
+```bash
+poetry install                    # установить зависимости
+poetry run alembic upgrade head   # создать таблицы в БД (по умолчанию файл cinema.db)
+poetry run python -m app.seed     # заполнить БД тестовыми фильмами
+poetry run fastapi dev app/main.py
+```
+
+Swagger с возможностью отправлять запросы: http://127.0.0.1:8000/docs
+
+| Метод | Путь | Что делает |
+|---|---|---|
+| GET | `/health` | проверка, что сервер жив |
+| GET | `/movies` | список фильмов: пагинация, фильтры `year`, `min_imdb`, `genre_id`, поиск `search`, сортировка `sort_by` + `order` |
+| GET | `/movies/{movie_id}` | полная карточка фильма |
+| GET | `/genres` | жанры с количеством фильмов |
+
+Структура:
+
+```
+app/
+  main.py          создание FastAPI и подключение роутеров
+  config.py        настройки из переменных окружения / .env
+  database.py      engine, сессии, Base, зависимость get_db
+  models/          ORM-модели SQLAlchemy (таблицы)
+  schemas/         Pydantic-схемы (формат JSON-ответов)
+  routers/         эндпоинты
+  seed.py          тестовые данные
+alembic/           миграции БД
+```
+
+После изменения моделей новая миграция создаётся так:
+`poetry run alembic revision --autogenerate -m "описание"`, затем `poetry run alembic upgrade head`.
+
+---
+
 General Description: Online Cinema
 
 An online cinema is a digital platform that allows users to select, watch, and purchase access to movies and other video materials via the internet. These services have become popular due to their convenience, a wide selection of content, and the ability to personalize the user experience.
