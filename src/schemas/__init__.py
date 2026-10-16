@@ -1,5 +1,6 @@
 from movies import (
     MoviDetailsSchema,
     MovieResponseSchema,
-    MovieListResponseSchema
+    MovieListResponseSchema,
+    MovieListItemSchema
 )

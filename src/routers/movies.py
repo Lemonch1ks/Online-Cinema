@@ -10,6 +10,7 @@ from db.models import (
 from schemas import (
     MoviDetailsSchema,
     MovieListResponseSchema,
+    MovieListItemSchema,
 )
 from fastapi import APIRouter, Query, Depends, HTTPException
 
@@ -57,10 +58,14 @@ async def get_movies(
     if not items:
         raise HTTPException(status_code=404, detail="No movies found.")
 
+    total_pages = (total_items + per_page - 1) // per_page
+
+    movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
+
     return MovieListResponseSchema(
-        movies=movies,
-        next_page=str(page + 1),
-        prev_page=str(page - 1),
-        total_pages=total_items // per_page,
+        movies=movie_list,
+        next_page=f"/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None,
+        prev_page=f"/movies/?page={page + 1}&per_page={per_page}" if page < total_pages else None,
+        total_pages=total_pages,
         total_items=total_items,
     )
