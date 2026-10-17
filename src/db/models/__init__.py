@@ -1,4 +1,4 @@
-from movies import (
+from src.db.models.movies import (
     Movie,
     Director,
     Star,

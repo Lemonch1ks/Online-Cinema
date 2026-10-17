@@ -1,6 +1,5 @@
-from movies import (
-    MoviDetailsSchema,
-    MovieResponseSchema,
+from src.schemas.movies import (
     MovieListResponseSchema,
-    MovieListItemSchema
+    MovieListItemSchema,
+    MoviDetailItemSchema,
 )

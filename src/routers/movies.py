@@ -1,18 +1,21 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from db import get_sqlite_db
+from src.db.sqlite_session import get_sqlite_db
 
 from sqlalchemy import select, func
 
-from db.models import (
+
+from src.db.models.movies import (
     Movie,
 )
 
-from schemas import (
-    MoviDetailsSchema,
+from src.schemas import (
     MovieListResponseSchema,
     MovieListItemSchema,
+    MoviDetailItemSchema,
 )
-from fastapi import APIRouter, Query, Depends, HTTPException
+
+from fastapi import APIRouter, Query, Depends, HTTPException, Request
+
 
 router = APIRouter()
 
@@ -39,11 +42,13 @@ router = APIRouter()
     }
 )
 async def get_movies(
-        page: int = Query(0, ge=1, description="Page number"),
+        request: Request,
+        page: int = Query(1, ge=1, description="Page number"),
         per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
-        db: AsyncSession = Depends(get_sqlite_db)
+        db: AsyncSession = Depends(get_sqlite_db),
 ) -> MovieListResponseSchema:
     offset = (page - 1) * per_page
+
 
     count_stmt = select(func.count(Movie.id))
     result_count = await db.execute(count_stmt)
@@ -52,20 +57,28 @@ async def get_movies(
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
 
-    items = await db.execute(select(Movie).offset(offset).limit(per_page))
-    movies = [items.scalars().all()]
+    stmt = select(Movie)
 
-    if not items:
+    items = await db.execute(stmt.order_by(Movie.id).offset(offset).limit(per_page))
+    movies = items.scalars().all()
+
+    if not movies:
         raise HTTPException(status_code=404, detail="No movies found.")
 
     total_pages = (total_items + per_page - 1) // per_page
 
     movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
 
+    def page_link(page_number: int) -> str:
+        url = request.url.include_query_params(page=page_number, per_page=per_page)
+        return f"{url.path}?{url.query}"
+
     return MovieListResponseSchema(
         movies=movie_list,
-        next_page=f"/movies/?page={page - 1}&per_page={per_page}" if page > 1 else None,
-        prev_page=f"/movies/?page={page + 1}&per_page={per_page}" if page < total_pages else None,
+        prev_page=page_link(page - 1) if page > 1 else None,
+        next_page=page_link(page + 1) if page < total_pages else None,
         total_pages=total_pages,
         total_items=total_items,
     )
+
+

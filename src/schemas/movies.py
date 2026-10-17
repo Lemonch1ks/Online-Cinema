@@ -1,9 +1,30 @@
 from decimal import Decimal
 from typing import List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from db.models.movies import Certification, Genre, Director, Star
+
+
+class GenreSchema(BaseModel):
+    id: int
+    name: str
+
+
+class CertificationSchema(BaseModel):
+    id: int
+    name: str
+
+
+class StarSchema(BaseModel):
+    id: int
+    name: str
+
+
+class DirectorSchema(BaseModel):
+    id: int
+    name: str
+
 
 
 class MovieBaseSchema(BaseModel):
@@ -12,22 +33,15 @@ class MovieBaseSchema(BaseModel):
     time: int
     imdb: float
     votes: int
-    meta_score: float | None
-    gross: float | None
     description: str
-    price: Decimal
-    certification_id: int
-    certification: Certification
-    genres: list[Genre]
-    directors: list[Director]
-    stars: list[Star]
 
-class MovieListItemSchema(BaseModel):
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class MovieListItemSchema(MovieBaseSchema):
     id: int
-    name: str
-    year: int
-    time: int
-    meta_score: float | None = None
 
 
 class MovieListResponseSchema(BaseModel):
@@ -37,25 +51,14 @@ class MovieListResponseSchema(BaseModel):
     total_pages: int
     total_items: int
 
-    model_config = {
-        "from_attributes": True,
-    }
 
-
-class MoviDetailsSchema(BaseModel):
+class MoviDetailItemSchema(MovieBaseSchema):
     id: int
-    uuid: str
-    name: str
-    year: int
-    time: int
-    imdb: float
-    votes: int
+    uuid: UUID
     meta_score: float | None
     gross: float | None
-    description: str
     price: Decimal
     certification_id: int
-    certification: Certification
-    genres: list[Genre]
-    directors: list[Director]
-    stars: list[Star]
+    genres: list[GenreSchema]
+    directors: list[DirectorSchema]
+    stars: list[StarSchema]
