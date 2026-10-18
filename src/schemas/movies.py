@@ -65,3 +65,5 @@ class MovieDetailItemSchema(MovieBaseSchema):
     genres: list[GenreSchema]
     directors: list[DirectorSchema]
     stars: list[StarSchema]
+
+

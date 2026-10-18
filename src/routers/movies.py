@@ -2,7 +2,7 @@ from typing import Annotated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.schemas.filters import MovieFilter
+from src.schemas.filters import MoviesQuery
 from src.db.sqlite_session import get_sqlite_db
 
 from sqlalchemy import select, func
@@ -49,16 +49,17 @@ router = APIRouter()
 )
 async def get_movies(
         request: Request,
-        filter_query: Annotated[MovieFilter, Query()],
+        query_params: Annotated[MoviesQuery, Query()],
         db: AsyncSession = Depends(get_sqlite_db),
 ) -> MovieListResponseSchema:
 
-    page = filter_query.page
-    per_page = filter_query.per_page
+    page = query_params.page
+    per_page = query_params.per_page
 
     stmt = select(Movie)
 
-    stmt = filter_query.filter(stmt)
+    stmt = query_params.filter(stmt)
+
 
     offset = (page - 1) * per_page
 
@@ -68,6 +69,8 @@ async def get_movies(
 
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
+
+    stmt = query_params.sort(stmt)
 
     items = await db.execute(stmt.order_by(Movie.id).offset(offset).limit(per_page))
     movies = items.scalars().all()
