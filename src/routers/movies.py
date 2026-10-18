@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.sqlite_session import get_sqlite_db
 
 from sqlalchemy import select, func
-
+from sqlalchemy.orm import selectinload
 
 from src.db.models.movies import (
     Movie,
@@ -11,7 +11,7 @@ from src.db.models.movies import (
 from src.schemas import (
     MovieListResponseSchema,
     MovieListItemSchema,
-    MoviDetailItemSchema,
+    MovieDetailItemSchema,
 )
 
 from fastapi import APIRouter, Query, Depends, HTTPException, Request
@@ -82,3 +82,38 @@ async def get_movies(
     )
 
 
+@router.get(
+    "/{movie_id}",
+    response_model=MovieDetailItemSchema,
+    summary="Get Movie Details",
+    responses={
+        404: {
+            "description": "Movie with the given ID was not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "No movies with id:1 found."}
+                }
+            },
+        }
+    }
+)
+async def get_movie_details(
+        movie_id: int,
+        db: AsyncSession = Depends(get_sqlite_db),
+) -> MovieDetailItemSchema:
+    stmt = (
+        select(Movie)
+        .where(Movie.id == movie_id)
+        .options(
+            selectinload(Movie.stars),
+            selectinload(Movie.directors),
+            selectinload(Movie.genres),
+        )
+    )
+
+    item = await db.execute(stmt)
+    movie = item.scalars().one_or_none()
+    if movie is None:
+        raise HTTPException(status_code=404, detail=f"No movies with id:{movie_id} found.")
+
+    return MovieDetailItemSchema.model_validate(movie)

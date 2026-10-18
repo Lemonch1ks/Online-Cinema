@@ -2,29 +2,30 @@ from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 
-
-
-class GenreSchema(BaseModel):
+class SideSchema(BaseModel):
     id: int
     name: str
+    model_config = {
+        "from_attributes": True,
+    }
 
 
-class CertificationSchema(BaseModel):
-    id: int
-    name: str
+class GenreSchema(SideSchema):
+    pass
 
 
-class StarSchema(BaseModel):
-    id: int
-    name: str
+class CertificationSchema(SideSchema):
+    pass
 
 
-class DirectorSchema(BaseModel):
-    id: int
-    name: str
+class StarSchema(SideSchema):
+    pass
 
+
+class DirectorSchema(SideSchema):
+    pass
 
 
 class MovieBaseSchema(BaseModel):
@@ -52,7 +53,7 @@ class MovieListResponseSchema(BaseModel):
     total_items: int
 
 
-class MoviDetailItemSchema(MovieBaseSchema):
+class MovieDetailItemSchema(MovieBaseSchema):
     id: int
     uuid: UUID
     meta_score: float | None
