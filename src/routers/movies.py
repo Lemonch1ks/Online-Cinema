@@ -58,8 +58,8 @@ async def get_movies(
 
     stmt = select(Movie)
 
+    stmt = query_params.search(stmt)
     stmt = query_params.filter(stmt)
-
 
     offset = (page - 1) * per_page
 

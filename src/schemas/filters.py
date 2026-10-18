@@ -2,7 +2,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Select, desc, asc
 
 from enum import Enum
-from src.db.models import Movie
+
+from sqlalchemy.sql import or_
+
+
+from src.db.models import Movie, Star, Director
 
 
 class BasePagination(BaseModel):
@@ -86,9 +90,29 @@ class MovieSort(BaseModel):
         return stmt
 
 
+class MovieSearch(BaseModel):
+    search_param: str | None = Field(None, min_length=1, description="Search term")
+
+    model_config = {"str_strip_whitespace": True}
+
+    def search(self, stmt: Select) -> Select:
+        if self.search_param is not None:
+            stmt = stmt.where(
+                or_(
+                    Movie.name.icontains(self.search_param, autoescape=True),
+                    Movie.description.icontains(self.search_param, autoescape=True),
+                    Movie.stars.any(Star.name.icontains(self.search_param, autoescape=True)),
+                    Movie.directors.any(Director.name.icontains(self.search_param, autoescape=True)),
+                )
+            )
+
+        return stmt
+
+
 class MoviesQuery(
     BasePagination,
     MovieFilter,
     MovieSort,
+    MovieSearch,
 ):
     model_config = {"extra": "forbid"}
