@@ -1,4 +1,8 @@
+from typing import Annotated
+
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from src.schemas.filters import MovieFilter
 from src.db.sqlite_session import get_sqlite_db
 
 from sqlalchemy import select, func
@@ -8,11 +12,12 @@ from src.db.models.movies import (
     Movie,
 )
 
-from src.schemas import (
+from src.schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
     MovieDetailItemSchema,
 )
+
 
 from fastapi import APIRouter, Query, Depends, HTTPException, Request
 
@@ -27,6 +32,7 @@ router = APIRouter()
     description=(
             "<h3>This endpoint retrieves a paginated list of movies from the database. "
             "Clients can specify the `page` number and the number of items per page using `per_page`. "
+            "Clients can use filters with query params"
             "The response includes details about the movies, total pages, and total items, "
             "along with links to the previous and next pages if applicable.</h3>"
     ),
@@ -43,21 +49,25 @@ router = APIRouter()
 )
 async def get_movies(
         request: Request,
-        page: int = Query(1, ge=1, description="Page number"),
-        per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        filter_query: Annotated[MovieFilter, Query()],
         db: AsyncSession = Depends(get_sqlite_db),
 ) -> MovieListResponseSchema:
+
+    page = filter_query.page
+    per_page = filter_query.per_page
+
+    stmt = select(Movie)
+
+    stmt = filter_query.filter(stmt)
+
     offset = (page - 1) * per_page
 
-
-    count_stmt = select(func.count(Movie.id))
+    count_stmt = select(func.count()).select_from(stmt.subquery())
     result_count = await db.execute(count_stmt)
     total_items = result_count.scalar() or 0
 
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
-
-    stmt = select(Movie)
 
     items = await db.execute(stmt.order_by(Movie.id).offset(offset).limit(per_page))
     movies = items.scalars().all()

@@ -1,8 +1,10 @@
+from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
 
 class SideSchema(BaseModel):
     id: int
