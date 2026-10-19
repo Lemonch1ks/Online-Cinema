@@ -22,7 +22,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/",
+    "",
     response_model=GenreListResponseSchema,
     summary="Shows list of movie genres",
 )

@@ -26,7 +26,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/",
+    "",
     response_model=MovieListResponseSchema,
     summary="Get Movie List",
     description=(
