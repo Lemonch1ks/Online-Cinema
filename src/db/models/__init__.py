@@ -5,3 +5,13 @@ from src.db.models.movies import (
     Genre,
     Certification
 )
+from src.db.models.user import (
+    User,
+    UserProfile,
+    UserGroup,
+)
+from src.db.models.tokens import (
+    ActivationToken,
+    RefreshToken,
+    PasswordResetToken,
+)
