@@ -92,20 +92,6 @@ files = [
 ]
 
 [[package]]
-name = "dotenv"
-version = "0.9.9"
-description = "Deprecated package"
-optional = false
-python-versions = "*"
-groups = ["main"]
-files = [
-    {file = "dotenv-0.9.9-py2.py3-none-any.whl", hash = "sha256:29cf74a087b31dafdb5a446b6d7e11cbce8ed2741540e2339c69fbef92c94ce9"},
-]
-
-[package.dependencies]
-python-dotenv = "*"
-
-[[package]]
 name = "fastapi"
 version = "0.143.0"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -840,4 +826,4 @@ standard = ["httptools (>=0.8.0)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.14"
-content-hash = "bdb668f4b65aeb6a53d34d634fc37c5bf994f8202b3a25fb8a3f8d1e32226fcb"
+content-hash = "2f2548752c55f496db70a4e1745f116740699ada11adcd6ecbffcba3cefd303e"
