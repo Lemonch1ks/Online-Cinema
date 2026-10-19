@@ -67,3 +67,19 @@ class MovieDetailItemSchema(MovieBaseSchema):
     stars: list[StarSchema]
 
 
+class GenreItemSchema(BaseModel):
+    id: int
+    name: str
+    movies_count: int
+
+
+class GenreListResponseSchema(BaseModel):
+    genres: List[GenreItemSchema]
+
+
+class GenreDetailItemSchema(BaseModel):
+    id: int
+    name: str
+    movies: List[MovieListItemSchema]
+
+    model_config = {"from_attributes": True}
