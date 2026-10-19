@@ -1,1 +1,0 @@
-from src.db.models.base import Base
