@@ -4,10 +4,12 @@ from enum import Enum
 
 from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import Enum as SQLEnum, func, Date
-from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy.orm import mapped_column, Mapped, relationship, validates
 from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean, Text
 
+from src.db.validators import validate_email, validate_password
 from src.db.models.base import Base
+from config.helper_functions import get_password_hash, verify_password
 
 if TYPE_CHECKING:
     from src.db.models.tokens import ActivationToken, PasswordResetToken, RefreshToken
@@ -35,7 +37,7 @@ class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
-    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    _hashed_password: Mapped[str] = mapped_column("hashed_password",String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, unique=False, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, nullable=True, onupdate=func.now())
@@ -45,6 +47,31 @@ class User(Base):
     activation_token: Mapped[Optional["ActivationToken"]] = relationship("ActivationToken", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     password_reset_token: Mapped[Optional["PasswordResetToken"]] = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan", passive_deletes=True)
+
+    def has_group(self, group_name: UserGroupEnum) -> bool:
+        return self.group.name == group_name
+
+    @property
+    def password(self) -> None:
+        raise AttributeError("Password is write-only. Use the setter to set the password.")
+
+    @password.setter
+    def password(self, raw_password: str) -> None:
+        validate_password(raw_password)
+        self._hashed_password = get_password_hash(raw_password)
+
+    def verify_password(self, raw_password: str) -> bool:
+        return verify_password(raw_password, self._hashed_password)
+
+    @validates("email")
+    def validate_email(self, key, value):
+        return validate_email(value.lower())
+
+    @classmethod
+    def create(cls, email: str, raw_password: str, group_id: int) -> User:
+        user = cls(email=email, group_id=group_id)
+        user.password = raw_password
+        return user
 
 
 class UserProfile(Base):

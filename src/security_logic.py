@@ -16,6 +16,7 @@ from sqlalchemy import select
 from src.schemas.tokens import TokenData
 from src.db.sqlite_session import get_sqlite_db
 from src.db.models import User
+from config.helper_functions import verify_password
 
 SECRET_KEY = base_app_settings.SECRET_KEY
 ALGORITHM = base_app_settings.ALGORITHM
@@ -25,15 +26,7 @@ password_hash = PasswordHash.recommended()
 
 DUMMY_HASH = password_hash.hash("dummypassword")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=base_app_settings.SECURITY_TOKEN_URL)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return password_hash.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    return password_hash.hash(password)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=base_app_settings.SECURITY_TOKEN_URL + "/token")
 
 
 async def get_user(db: AsyncSession, email: str) -> User | None:
@@ -48,7 +41,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
     if not user:
         verify_password(password, DUMMY_HASH)
         return None
-    if not verify_password(password, user.hashed_password):
+    if not user.verify_password(password):
         return None
     return user
 
@@ -64,7 +57,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     return encoded_jwt
 
 
-async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: AsyncSession = Depends(get_sqlite_db)) -> User | None | Exception:
+async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: AsyncSession = Depends(get_sqlite_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -86,7 +79,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: As
 
 async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
-) -> User | Exception:
+) -> User:
     if not current_user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user")
     return current_user
