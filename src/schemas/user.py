@@ -7,6 +7,15 @@ class UserSchema(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class EmailRequestSchema(BaseModel):
+    email: EmailStr
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value):
+        return value.lower()
+
+
 class UserCreationSchema(BaseModel):
     email: EmailStr
     password: str

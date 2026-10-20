@@ -7,7 +7,6 @@ from jwt.exceptions import InvalidTokenError
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from pwdlib import PasswordHash
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import base_app_settings
@@ -16,15 +15,13 @@ from sqlalchemy import select
 from src.schemas.tokens import TokenData
 from src.db.sqlite_session import get_sqlite_db
 from src.db.models import User
-from config.helper_functions import verify_password
+from config.security import get_password_hash, verify_password
 
 SECRET_KEY = base_app_settings.SECRET_KEY
 ALGORITHM = base_app_settings.ALGORITHM
 
 
-password_hash = PasswordHash.recommended()
-
-DUMMY_HASH = password_hash.hash("dummypassword")
+DUMMY_HASH = get_password_hash("dummypassword")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=base_app_settings.SECURITY_TOKEN_URL + "/token")
 

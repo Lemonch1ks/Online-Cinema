@@ -6,6 +6,7 @@ from src.routers.movies import router as movie_router
 from src.routers.genres import router as genre_router
 from src.routers.security import router as security_router
 from src.routers.user import router as user_router
+from src.routers.accounts import router as accounts_router
 
 app = FastAPI(
     title="Movie API",
@@ -20,3 +21,4 @@ app.include_router(movie_router, prefix=f"{api_version_prefix}/movies", tags=["m
 app.include_router(genre_router, prefix=f"{api_version_prefix}/genres", tags=["genres"])
 app.include_router(security_router, prefix=base_app_settings.SECURITY_TOKEN_URL, tags=["security"])
 app.include_router(user_router, prefix=f"{api_version_prefix}/users", tags=["users"])
+app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["accounts"])

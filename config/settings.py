@@ -16,7 +16,9 @@ class BaseAppSettings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
 
-    ACTIVATION_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/activate/"
+    ACTIVATION_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/activate"
+
+    ACTIVATION_LINK_ENDPOINT: str = f"http://127.0.0.1:8000{ACTIVATION_LINK_BASE}"
 
     EMAIL_HOSTNAME: str
     EMAIL_PORT: int

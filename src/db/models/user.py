@@ -9,7 +9,7 @@ from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean, Text
 
 from src.db.validators import validate_email, validate_password
 from src.db.models.base import Base
-from config.helper_functions import get_password_hash, verify_password
+from config.security import get_password_hash, verify_password
 
 if TYPE_CHECKING:
     from src.db.models.tokens import ActivationToken, PasswordResetToken, RefreshToken

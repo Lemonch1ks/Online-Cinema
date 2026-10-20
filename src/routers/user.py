@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.settings import base_app_settings
+from src.notifications.helpers import create_and_send_an_activation_link
 from src.notifications.dependencies import get_email_sender
 from src.notifications.emails import EmailSender, BaseEmailError
 from src.db.models import ActivationToken
@@ -68,10 +68,6 @@ async def register_user(
             detail="An error occurred during user creation."
         ) from e
 
-    activation_link = f"http://127.0.0.1{base_app_settings.ACTIVATION_LINK_BASE}{act_token}"
-    try:
-        await email_sender.send_activation_email(new_user.email, activation_link)
-    except BaseEmailError:
-        logger.exception("Failed to send activation email to %s", new_user.email)
+    await create_and_send_an_activation_link(act_token=act_token, user=new_user, email_sender=email_sender)
 
     return UserSchema.model_validate(new_user)
