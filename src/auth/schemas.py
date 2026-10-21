@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, AliasPath
 
+from src.auth.models import UserGroupEnum
 from src.auth.validators import validate_password
 
 
@@ -65,3 +66,11 @@ class UserNewPasswordSchema(BaseModel):
     @classmethod
     def validate_password(cls, value):
         return validate_password(value)
+
+
+class AdminChangeGroupSchema(BaseModel):
+    new_group_rank: UserGroupEnum
+
+
+class UserWithGroupSchema(UserSchema):
+    group_rank: UserGroupEnum = Field(validation_alias=AliasPath("group", "name"))
