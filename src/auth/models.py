@@ -13,10 +13,10 @@ from src.core.config import settings
 from src.core.database import Base
 
 
-class UserGroupEnum(str, Enum):
-    USER = 'USER'
-    MODERATOR = 'MODERATOR'
-    ADMIN = 'ADMIN'
+class UserGroupEnum(int, Enum):
+    USER = 1
+    MODERATOR = 5
+    ADMIN = 10
 
 
 class GenderEnum(str, Enum):

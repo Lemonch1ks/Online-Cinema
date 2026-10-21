@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
+from sqlalchemy.orm import joinedload
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 async def get_user(db: AsyncSession, email: str) -> User | None:
-    stmt = select(User).where(User.email == email)
+    stmt = select(User).where(User.email == email).options(joinedload(User.group))
     item = await db.execute(stmt)
     return item.scalar_one_or_none()
 

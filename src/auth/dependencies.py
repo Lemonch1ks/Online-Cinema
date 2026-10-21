@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.models import User
+from src.auth.models import User, UserGroupEnum
 from src.auth.schemas import TokenData
 from src.auth.security import decode_access_token
 from src.auth.service import get_user
@@ -44,3 +44,12 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user")
     return current_user
+
+
+def require_role(min_role: UserGroupEnum):
+    async def checker(user: User = Depends(get_current_active_user)) -> User:
+        if user.group.name < min_role:
+            raise HTTPException(status_code=403, detail="Not enough permissions")
+        return user
+
+    return checker
