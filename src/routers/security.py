@@ -11,7 +11,6 @@ from config.settings import base_app_settings
 from src.db.models import User, RefreshToken
 from src.db.sqlite_session import get_sqlite_db
 from src.security_logic import authenticate_user, create_access_token, get_current_active_user, create_refresh_token
-from src.schemas.user import UserSchema
 from src.schemas.tokens import Token, TokenVerifySchema
 
 router = APIRouter()
@@ -82,13 +81,6 @@ async def token_refresh(
         raise HTTPException(status_code=400, detail="Failed to refresh token") from e
 
     return Token(access_token=access_token, token_type="bearer", refresh_token=new_refresh_token)
-
-
-@router.get("/users/me")
-async def read_users_me(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> UserSchema:
-    return current_user
 
 
 @router.post("/logout", summary="Log out (revokes the given refresh token)", status_code=204)
