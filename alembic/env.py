@@ -15,11 +15,11 @@ import src.movies.models  # noqa: F401
 # access to the values within the .ini file in use.
 config = context.config
 
-# Alembic runs migrations synchronously, so use the plain sqlite driver here
-# (the app itself uses sqlite+aiosqlite).
+# Alembic runs migrations synchronously, so it gets the sync twin of the app's async driver.
+# "%" is escaped because ConfigParser treats it as interpolation syntax.
 config.set_main_option(
     "sqlalchemy.url",
-    f"sqlite:///{settings.DB_PATH.as_posix()}",
+    settings.SYNC_DATABASE_URL.replace("%", "%%"),
 )
 
 # Interpret the config file for Python logging.

@@ -1,6 +1,8 @@
 from datetime import timedelta
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -15,6 +17,9 @@ class Settings(BaseSettings):
     API_VERSION_PREFIX: str = "/api/v1"
 
     # --- Database ---
+    # Async SQLAlchemy URL. Leave empty to use a local SQLite file at DB_PATH.
+    # For PostgreSQL: postgresql+asyncpg://user:password@host:5432/dbname
+    DATABASE_URL: str = ""
     DB_PATH: Path = BASE_DIR / "cinema.db"
     DB_ECHO: bool = False
 
@@ -61,7 +66,20 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 
-    # Built from APP_BASE_URL at access time, so an override from .env is respected.
+    @model_validator(mode="after")
+    def _default_database_url(self) -> "Settings":
+        if not self.DATABASE_URL:
+            self.DATABASE_URL = f"sqlite+aiosqlite:///{self.DB_PATH.as_posix()}"
+        return self
+
+
+    @property
+    def SYNC_DATABASE_URL(self) -> str:
+        sync_drivers = {"sqlite+aiosqlite": "sqlite", "postgresql+asyncpg": "postgresql+psycopg"}
+        url = make_url(self.DATABASE_URL)
+        return url.set(drivername=sync_drivers.get(url.drivername, url.drivername)).render_as_string(hide_password=False)
+
+
     @property
     def ACTIVATION_LINK_ENDPOINT(self) -> str:
         return f"{self.APP_BASE_URL}{self.ACTIVATION_LINK_BASE}"
