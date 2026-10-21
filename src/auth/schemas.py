@@ -72,5 +72,11 @@ class AdminChangeGroupSchema(BaseModel):
     new_group_rank: UserGroupEnum
 
 
-class UserWithGroupSchema(UserSchema):
+class AdminChangesUserSchema(BaseModel):
+    id: int
+    email: EmailStr
     group_rank: UserGroupEnum = Field(validation_alias=AliasPath("group", "name"))
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
