@@ -7,7 +7,6 @@ from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
 from src.security_logic import get_current_active_user
 from src.notifications.helpers import create_and_send_an_activation_link
 from src.notifications.dependencies import get_email_sender
@@ -17,10 +16,10 @@ from src.db.models.user import UserGroupEnum, UserGroup, User
 from src.schemas.user import UserSchema, UserCreationSchema, UserChangePasswordSchema
 from src.db.sqlite_session import get_sqlite_db
 
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
 
 @router.post(
     "/register",

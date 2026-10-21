@@ -47,13 +47,11 @@ async def activate_account(
             detail="Invalid activation token.",
         )
 
-
     if not validate_activation_token_by_time(activation_token):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Activation token has expired. Request a new one.",
         )
-
 
     user = activation_token.user
     user_email = user.email
@@ -87,8 +85,6 @@ async def activate_account(
         "so it does not reveal which emails are registered."
     ),
 )
-
-
 async def resend_activation_link(
         data: EmailRequestSchema,
         db: AsyncSession = Depends(get_sqlite_db),

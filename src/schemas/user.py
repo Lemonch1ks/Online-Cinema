@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator, Field
+from pydantic import BaseModel, EmailStr, field_validator
 from src.db.validators import validate_password
 
 class UserSchema(BaseModel):
