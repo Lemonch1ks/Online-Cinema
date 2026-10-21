@@ -1,18 +1,22 @@
 import logging
 import secrets
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+
+from src.security_logic import get_current_active_user
 from src.notifications.helpers import create_and_send_an_activation_link
 from src.notifications.dependencies import get_email_sender
-from src.notifications.emails import EmailSender, BaseEmailError
-from src.db.models import ActivationToken
+from src.notifications.emails import EmailSender
+from src.db.models import ActivationToken, RefreshToken
 from src.db.models.user import UserGroupEnum, UserGroup, User
-from src.schemas.user import UserSchema, UserCreationSchema
+from src.schemas.user import UserSchema, UserCreationSchema, UserChangePasswordSchema
 from src.db.sqlite_session import get_sqlite_db
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,3 +75,32 @@ async def register_user(
     await create_and_send_an_activation_link(act_token=act_token, user=new_user, email_sender=email_sender)
 
     return UserSchema.model_validate(new_user)
+
+
+@router.post(
+    "/change_password",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def change_password(
+        user_data: UserChangePasswordSchema,
+        user: Annotated[User, Depends(get_current_active_user)],
+        db: AsyncSession = Depends(get_sqlite_db),
+):
+    if not user.verify_password(user_data.old_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials.")
+
+    if user_data.new_password == user_data.old_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password cannot match the old one")
+
+    try:
+        user.password = user_data.new_password
+        stmt = delete(RefreshToken).where(RefreshToken.user_id == user.id)
+        await db.execute(stmt)
+        await db.commit()
+    except SQLAlchemyError as e:
+        await db.rollback()
+        logger.error(e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to change password."
+        )

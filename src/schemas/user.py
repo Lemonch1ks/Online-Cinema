@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, Field
 from src.db.validators import validate_password
 
 class UserSchema(BaseModel):
@@ -26,6 +26,16 @@ class UserCreationSchema(BaseModel):
         return value.lower()
 
     @field_validator("password")
+    @classmethod
+    def validate_password(cls, value):
+        return validate_password(value)
+
+
+class UserChangePasswordSchema(BaseModel):
+    new_password: str
+    old_password: str
+
+    @field_validator("new_password")
     @classmethod
     def validate_password(cls, value):
         return validate_password(value)
