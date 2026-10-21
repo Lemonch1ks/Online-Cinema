@@ -1,5 +1,4 @@
 import logging
-import secrets
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,16 +8,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 
-from src.notifications.helpers import (
+from src.auth.models import ActivationToken, User, PasswordResetToken, RefreshToken
+from src.auth.schemas import EmailRequestSchema, UserNewPasswordSchema
+from src.auth.security import generate_token
+from src.auth.service import (
     validate_token_by_time,
     create_and_send_an_activation_link,
-    create_and_send_a_password_reset_link
+    create_and_send_a_password_reset_link,
 )
-
-from config.settings import base_app_settings
-from src.db.models import ActivationToken, User, PasswordResetToken, RefreshToken
-from src.schemas.user import EmailRequestSchema, UserNewPasswordSchema
-from src.db.sqlite_session import get_sqlite_db
+from src.core.config import settings
+from src.core.database import get_db
 from src.notifications.dependencies import get_email_sender
 from src.notifications.emails import EmailSender, BaseEmailError
 
@@ -36,7 +35,7 @@ router = APIRouter()
 )
 async def activate_account(
         token: str,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
         email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
     stmt = (
@@ -73,7 +72,7 @@ async def activate_account(
             detail="An error occurred during account activation.",
         ) from e
 
-    login_link = f"{base_app_settings.APP_BASE_URL}{base_app_settings.SECURITY_TOKEN_URL}/token"
+    login_link = settings.LOGIN_LINK_ENDPOINT
     try:
         await email_sender.send_activation_complete_email(user_email, login_link)
     except BaseEmailError:
@@ -93,7 +92,7 @@ async def activate_account(
 )
 async def resend_activation_link(
         data: EmailRequestSchema,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
         email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
     response = {"detail": "If the account exists and is not activated, a new activation link has been sent."}
@@ -109,13 +108,13 @@ async def resend_activation_link(
     if user is None or user.is_active:
         return response
 
-    new_token = secrets.token_urlsafe(32)
+    new_token = generate_token(settings.ACTIVATION_TOKEN_NBYTES)
 
     try:
         if user.activation_token:
             user.activation_token.token = new_token
             user.activation_token.expires_at = (
-                datetime.now(timezone.utc) + base_app_settings.ACTIVATION_TOKEN_LIFETIME
+                datetime.now(timezone.utc) + settings.ACTIVATION_TOKEN_LIFETIME
             )
         else:
             db.add(ActivationToken(user_id=user.id, token=new_token))
@@ -139,7 +138,7 @@ async def resend_activation_link(
 )
 async def reset_password_request(
         email: EmailRequestSchema,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
         email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
     response = {"detail": "If the account exists a new password reset link has been sent."}
@@ -154,13 +153,13 @@ async def reset_password_request(
     if not user or not user.is_active:
         return response
 
-    new_reset_token = secrets.token_urlsafe(32)
+    new_reset_token = generate_token(settings.PASSWORD_RESET_TOKEN_NBYTES)
 
     try:
         if user.password_reset_token:
             user.password_reset_token.token = new_reset_token
             user.password_reset_token.expires_at = (
-                datetime.now(timezone.utc) + base_app_settings.PASSWORD_RESET_TOKEN_LIFETIME
+                datetime.now(timezone.utc) + settings.PASSWORD_RESET_TOKEN_LIFETIME
             )
         else:
             db.add(PasswordResetToken(user_id=user.id, token=new_reset_token))
@@ -191,7 +190,7 @@ async def reset_password_request(
 )
 async def check_password_reset_token(
         token: str,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     result = await db.execute(select(PasswordResetToken).where(PasswordResetToken.token == token))
     password_reset_token = result.scalar_one_or_none()
@@ -218,7 +217,7 @@ async def check_password_reset_token(
 )
 async def complete_password_reset(
         data: UserNewPasswordSchema,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
         email_sender: EmailSender = Depends(get_email_sender),
 ):
     stmt = (
@@ -258,7 +257,7 @@ async def complete_password_reset(
             detail="An error occurred during resetting the password.",
         ) from e
 
-    login_link = f"{base_app_settings.APP_BASE_URL}{base_app_settings.SECURITY_TOKEN_URL}/token"
+    login_link = settings.LOGIN_LINK_ENDPOINT
     try:
         await email_sender.send_password_reset_complete_email(user_email, login_link)
     except BaseEmailError:

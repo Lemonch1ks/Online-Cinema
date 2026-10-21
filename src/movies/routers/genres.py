@@ -1,16 +1,16 @@
-from src.schemas.movies import (
+from src.movies.schemas import (
     GenreDetailItemSchema,
     GenreListResponseSchema,
     GenreItemSchema
 )
 
-from src.db.models.movies import (
+from src.movies.models import (
     Movie, Genre,
 )
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.db.sqlite_session import get_sqlite_db
+from src.core.database import get_db
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -27,7 +27,7 @@ router = APIRouter()
     summary="Shows list of movie genres",
 )
 async def get_movie_genres(
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> GenreListResponseSchema:
     stmt = select(Genre, func.count(Movie.id).label("movies_count")).outerjoin(Genre.movies).group_by(Genre).order_by(Genre.id)
 
@@ -63,7 +63,7 @@ async def get_movie_genres(
 )
 async def get_genre_details(
         genre_id: int,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> GenreDetailItemSchema:
     stmt = select(Genre).where(Genre.id == genre_id).options(selectinload(Genre.movies))
     item = await db.execute(stmt)

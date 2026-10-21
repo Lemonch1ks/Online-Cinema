@@ -7,11 +7,13 @@ from sqlalchemy.exc import DatabaseError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config.settings import base_app_settings
-from src.db.models import User, RefreshToken
-from src.db.sqlite_session import get_sqlite_db
-from src.security_logic import authenticate_user, create_access_token, get_current_active_user, create_refresh_token
-from src.schemas.tokens import Token, TokenVerifySchema
+from src.auth.dependencies import get_current_active_user
+from src.auth.models import User, RefreshToken
+from src.auth.schemas import Token, TokenVerifySchema
+from src.auth.security import create_access_token, create_refresh_token
+from src.auth.service import authenticate_user
+from src.core.config import settings
+from src.core.database import get_db
 
 router = APIRouter()
 
@@ -19,7 +21,7 @@ router = APIRouter()
 @router.post("/token", description="Enter your email to 'username' field")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: AsyncSession = Depends(get_sqlite_db),
+    db: AsyncSession = Depends(get_db),
 ) -> Token:
     user = await authenticate_user(db, form_data.username.lower(), form_data.password)
     if not user:
@@ -32,7 +34,7 @@ async def login_for_access_token(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user")
 
-    access_token_expires = base_app_settings.ACCESS_TOKEN_LIFETIME
+    access_token_expires = settings.ACCESS_TOKEN_LIFETIME
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
@@ -47,7 +49,7 @@ async def login_for_access_token(
 
 @router.post("/refresh", summary="Refresh your access token with refresh token")
 async def token_refresh(
-        current_token: TokenVerifySchema, db: AsyncSession = Depends(get_sqlite_db),
+        current_token: TokenVerifySchema, db: AsyncSession = Depends(get_db),
 ) -> Token:
     stmt = (
         select(RefreshToken)
@@ -67,7 +69,7 @@ async def token_refresh(
         raise HTTPException(status_code=403, detail="Inactive user")
 
     access_token = create_access_token(
-        data={"sub": db_token.user.email}, expires_delta=base_app_settings.ACCESS_TOKEN_LIFETIME
+        data={"sub": db_token.user.email}, expires_delta=settings.ACCESS_TOKEN_LIFETIME
     )
 
 
@@ -87,7 +89,7 @@ async def token_refresh(
 async def users_logout(
         current_user: Annotated[User, Depends(get_current_active_user)],
         refresh_token: TokenVerifySchema,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> None:
     stmt = delete(RefreshToken).where(
         RefreshToken.user_id == current_user.id,

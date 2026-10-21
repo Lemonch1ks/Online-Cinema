@@ -2,17 +2,17 @@ from typing import Annotated
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.schemas.filters import MoviesQuery
-from src.db.sqlite_session import get_sqlite_db
+from src.movies.filters import MoviesQuery
+from src.core.database import get_db
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from src.db.models.movies import (
+from src.movies.models import (
     Movie,
 )
 
-from src.schemas.movies import (
+from src.movies.schemas import (
     MovieListResponseSchema,
     MovieListItemSchema,
     MovieDetailItemSchema,
@@ -50,7 +50,7 @@ router = APIRouter()
 async def get_movies(
         request: Request,
         query_params: Annotated[MoviesQuery, Query()],
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> MovieListResponseSchema:
 
     page = query_params.page
@@ -112,7 +112,7 @@ async def get_movies(
 )
 async def get_movie_details(
         movie_id: int,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ) -> MovieDetailItemSchema:
     stmt = (
         select(Movie)

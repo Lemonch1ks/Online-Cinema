@@ -1,18 +1,16 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from enum import Enum
 
-from typing import TYPE_CHECKING, List, Optional
+from typing import List, Optional
 from sqlalchemy import Enum as SQLEnum, func, Date
 from sqlalchemy.orm import mapped_column, Mapped, relationship, validates
 from sqlalchemy import String, Integer, ForeignKey, DateTime, Boolean, Text
 
-from src.db.validators import validate_email, validate_password
-from src.db.models.base import Base
-from config.security import get_password_hash, verify_password
-
-if TYPE_CHECKING:
-    from src.db.models.tokens import ActivationToken, PasswordResetToken, RefreshToken
+from src.auth.security import get_password_hash, verify_password
+from src.auth.validators import validate_email, validate_password
+from src.core.config import settings
+from src.core.database import Base
 
 
 class UserGroupEnum(str, Enum):
@@ -85,3 +83,39 @@ class UserProfile(Base):
     gender: Mapped[GenderEnum | None] = mapped_column(SQLEnum(GenderEnum), nullable=True)
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     info: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ActivationToken(Base):
+    __tablename__ = "activation_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id', ondelete="CASCADE"), unique=True, nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="activation_token")
+    token: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, default=lambda: datetime.now(timezone.utc) + settings.ACTIVATION_TOKEN_LIFETIME)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="password_reset_token")
+    token: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, default=lambda: datetime.now(timezone.utc) + settings.PASSWORD_RESET_TOKEN_LIFETIME)
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
+    token: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, default=lambda: datetime.now(timezone.utc) + settings.REFRESH_TOKEN_LIFETIME)
+
+    def check_if_token_is_valid(self) -> bool:
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at < datetime.now(timezone.utc):
+            return False
+        return True

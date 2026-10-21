@@ -1,5 +1,4 @@
 import logging
-import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -7,14 +6,15 @@ from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.security_logic import get_current_active_user
-from src.notifications.helpers import create_and_send_an_activation_link
+from src.auth.dependencies import get_current_active_user
+from src.auth.models import ActivationToken, RefreshToken, UserGroupEnum, UserGroup, User
+from src.auth.schemas import UserSchema, UserCreationSchema, UserChangePasswordSchema
+from src.auth.security import generate_token
+from src.auth.service import create_and_send_an_activation_link
+from src.core.config import settings
+from src.core.database import get_db
 from src.notifications.dependencies import get_email_sender
 from src.notifications.emails import EmailSender
-from src.db.models import ActivationToken, RefreshToken
-from src.db.models.user import UserGroupEnum, UserGroup, User
-from src.schemas.user import UserSchema, UserCreationSchema, UserChangePasswordSchema
-from src.db.sqlite_session import get_sqlite_db
 
 logger = logging.getLogger(__name__)
 
@@ -28,11 +28,11 @@ router = APIRouter()
 )
 async def register_user(
         user_data: UserCreationSchema,
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
         email_sender: EmailSender = Depends(get_email_sender),
 ) -> UserSchema:
 
-    act_token = secrets.token_urlsafe(32)
+    act_token = generate_token(settings.ACTIVATION_TOKEN_NBYTES)
 
     stmt = select(User).where(User.email == user_data.email)
 
@@ -83,7 +83,7 @@ async def register_user(
 async def change_password(
         user_data: UserChangePasswordSchema,
         user: Annotated[User, Depends(get_current_active_user)],
-        db: AsyncSession = Depends(get_sqlite_db),
+        db: AsyncSession = Depends(get_db),
 ):
     if not user.verify_password(user_data.old_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials.")

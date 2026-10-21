@@ -2,18 +2,23 @@ import re
 
 import email_validator
 
+from src.core.config import settings
+
 
 def validate_password(password):
-    if len(password) < 8:
-        raise ValueError("Password must contain at least 8 characters.")
+    if len(password) < settings.PASSWORD_MIN_LENGTH:
+        raise ValueError(f"Password must contain at least {settings.PASSWORD_MIN_LENGTH} characters.")
     if not re.search(r'[A-Z]', password):
         raise ValueError("Password must contain at least one uppercase letter.")
     if not re.search(r'[a-z]', password):
         raise ValueError("Password must contain at least one lower letter.")
     if not re.search(r'\d', password):
         raise ValueError("Password must contain at least one digit.")
-    if not re.search(r'[@$!%*?&#]', password):
-        raise ValueError("Password must contain at least one special character: @, $, !, %, *, ?, #, &.")
+    if not re.search(f"[{re.escape(settings.PASSWORD_SPECIAL_CHARS)}]", password):
+        raise ValueError(
+            "Password must contain at least one special character: "
+            f"{', '.join(settings.PASSWORD_SPECIAL_CHARS)}."
+        )
     return password
 
 

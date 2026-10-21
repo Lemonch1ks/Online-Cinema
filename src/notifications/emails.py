@@ -25,6 +25,10 @@ class EmailSender():
         activation_complete_email_template_name: str,
         password_email_template_name: str,
         password_complete_email_template_name: str,
+        activation_email_subject: str,
+        activation_complete_email_subject: str,
+        password_email_subject: str,
+        password_complete_email_subject: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -35,6 +39,10 @@ class EmailSender():
         self._activation_complete_email_template_name = activation_complete_email_template_name
         self._password_email_template_name = password_email_template_name
         self._password_complete_email_template_name = password_complete_email_template_name
+        self._activation_email_subject = activation_email_subject
+        self._activation_complete_email_subject = activation_complete_email_subject
+        self._password_email_subject = password_email_subject
+        self._password_complete_email_subject = password_complete_email_subject
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
 
@@ -79,7 +87,7 @@ class EmailSender():
         """
         template = self._env.get_template(self._activation_email_template_name)
         html_content = template.render(email=email, activation_link=activation_link)
-        subject = "Account Activation"
+        subject = self._activation_email_subject
         await self._send_email(email, subject, html_content)
 
     async def send_activation_complete_email(self, email: str, login_link: str) -> None:
@@ -92,7 +100,7 @@ class EmailSender():
         """
         template = self._env.get_template(self._activation_complete_email_template_name)
         html_content = template.render(email=email, login_link=login_link)
-        subject = "Account Activated Successfully"
+        subject = self._activation_complete_email_subject
         await self._send_email(email, subject, html_content)
 
     async def send_password_reset_email(self, email: str, reset_link: str) -> None:
@@ -105,7 +113,7 @@ class EmailSender():
         """
         template = self._env.get_template(self._password_email_template_name)
         html_content = template.render(email=email, reset_link=reset_link)
-        subject = "Password Reset Request"
+        subject = self._password_email_subject
         await self._send_email(email, subject, html_content)
 
     async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
@@ -118,6 +126,6 @@ class EmailSender():
         """
         template = self._env.get_template(self._password_complete_email_template_name)
         html_content = template.render(email=email, login_link=login_link)
-        subject = "Your Password Has Been Successfully Reset"
+        subject = self._password_complete_email_subject
         await self._send_email(email, subject, html_content)
 

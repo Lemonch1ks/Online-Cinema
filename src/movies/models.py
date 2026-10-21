@@ -1,6 +1,6 @@
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy import String, Float, Integer, DECIMAL, ForeignKey, Uuid, UniqueConstraint, Text, Table, Column
-from src.db.models.base import Base
+from src.core.database import Base
 from uuid import UUID, uuid4
 from decimal import Decimal
 

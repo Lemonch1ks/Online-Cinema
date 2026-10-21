@@ -1,5 +1,21 @@
-from pydantic import BaseModel, EmailStr, field_validator
-from src.db.validators import validate_password
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from src.auth.validators import validate_password
+
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    email: str
+
+
+class TokenVerifySchema(BaseModel):
+    refresh_token: str = Field(min_length=1)
+
 
 class UserSchema(BaseModel):
     id: int

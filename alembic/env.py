@@ -6,9 +6,10 @@ from sqlalchemy import pool
 from alembic import context
 
 
-from config.settings import BaseAppSettings
-from src.db.models.base import Base
-import src.db.models  # noqa: F401  (registers all models in Base.metadata)
+from src.core.config import settings
+from src.core.database import Base
+import src.auth.models  # noqa: F401  (register all models in Base.metadata)
+import src.movies.models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,7 +19,7 @@ config = context.config
 # (the app itself uses sqlite+aiosqlite).
 config.set_main_option(
     "sqlalchemy.url",
-    f"sqlite:///{BaseAppSettings().DB_PATH.as_posix()}",
+    f"sqlite:///{settings.DB_PATH.as_posix()}",
 )
 
 # Interpret the config file for Python logging.
