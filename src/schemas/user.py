@@ -39,3 +39,13 @@ class UserChangePasswordSchema(BaseModel):
     @classmethod
     def validate_password(cls, value):
         return validate_password(value)
+
+
+class UserNewPasswordSchema(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, value):
+        return validate_password(value)
