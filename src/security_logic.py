@@ -1,3 +1,5 @@
+import secrets
+
 import jwt
 
 from typing import Annotated
@@ -7,6 +9,7 @@ from jwt.exceptions import InvalidTokenError
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import base_app_settings
@@ -52,6 +55,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def create_refresh_token() -> str:
+    return secrets.token_urlsafe(48)
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: AsyncSession = Depends(get_sqlite_db)) -> User:

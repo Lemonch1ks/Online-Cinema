@@ -37,3 +37,12 @@ class RefreshToken(Base):
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")
     token: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), unique=False, default=lambda: datetime.now(timezone.utc) + base_app_settings.REFRESH_TOKEN_LIFETIME)
+
+    def check_if_token_is_valid(self) -> bool:
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+        if expires_at < datetime.now(timezone.utc):
+            return False
+        return True
