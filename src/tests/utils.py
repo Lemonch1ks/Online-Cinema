@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.models import User
 from src.core.config import settings
 
+
 TEST_EMAIL = "testuser@example.com"
 TEST_PASSWORD = "Testpassword1@"
 TEST_USER_GROUP_ID = 1
@@ -10,6 +11,7 @@ TEST_USER_GROUP_ID = 1
 LOGIN_URL = f"{settings.SECURITY_TOKEN_URL}/token"
 REFRESH_URL = f"{settings.SECURITY_TOKEN_URL}/refresh"
 LOGOUT_URL = f"{settings.SECURITY_TOKEN_URL}/logout"
+
 
 
 async def create_user(

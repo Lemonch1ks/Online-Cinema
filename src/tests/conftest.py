@@ -80,3 +80,8 @@ async def auth_tokens(client: AsyncClient, active_user: User) -> dict:
     response = await client.post(LOGIN_URL, data={"username": TEST_EMAIL, "password": TEST_PASSWORD})
     assert response.status_code == 200
     return response.json()
+
+
+@pytest.fixture()
+def auth_headers(auth_tokens: dict) -> dict:
+    return {"Authorization": f"Bearer {auth_tokens['access_token']}"}
