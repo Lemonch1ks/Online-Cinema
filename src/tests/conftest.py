@@ -1,18 +1,17 @@
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio
-from httpx2 import AsyncClient, ASGITransport
+from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.auth.models import UserGroup, UserGroupEnum
+from src.auth.models import UserGroup, UserGroupEnum, User
 from src.core.config import settings
 from src.core.database import Base, enable_sqlite_foreign_keys, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
-
 
 # StaticPool: in-memory SQLite lives per connection, so all sessions must share one.
 engine = create_async_engine(
