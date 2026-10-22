@@ -30,12 +30,10 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
 
 
 def decode_access_token(token: str) -> dict:
-    """Decode and verify an access token. Raises jwt.InvalidTokenError if it is invalid or expired."""
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
 
 def generate_token(nbytes: int) -> str:
-    """Return a random URL-safe token built from `nbytes` random bytes."""
     return secrets.token_urlsafe(nbytes)
 
 

@@ -8,10 +8,10 @@ from jinja2 import Environment, FileSystemLoader
 
 class BaseEmailError(Exception):
     """Base class for all exceptions raised by email notification module."""
-    pass
+    pass  # noqa: PIE790
 
 
-class EmailSender():
+class EmailSender():  # noqa: UP039
 
     def __init__(
         self,

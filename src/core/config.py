@@ -97,4 +97,4 @@ class Settings(BaseSettings):
         return f"{self.APP_BASE_URL}{self.SECURITY_TOKEN_URL}/token"
 
 
-settings = Settings()
+settings = Settings() # type: ignore

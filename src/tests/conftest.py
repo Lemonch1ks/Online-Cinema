@@ -7,11 +7,12 @@ from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.auth.models import UserGroup, UserGroupEnum, User
+from src.auth.models import User, UserGroup, UserGroupEnum
 from src.core.config import settings
 from src.core.database import Base, enable_sqlite_foreign_keys, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
+from src.tests.utils import LOGIN_URL, TEST_EMAIL, TEST_PASSWORD, create_user
 
 # StaticPool: in-memory SQLite lives per connection, so all sessions must share one.
 engine = create_async_engine(
@@ -67,3 +68,15 @@ async def client(email_sender: FakeEmailSender) -> AsyncGenerator[AsyncClient, N
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac_client:
         yield ac_client
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture()
+async def active_user(db_session: AsyncSession) -> User:
+    return await create_user(db_session)
+
+
+@pytest_asyncio.fixture()
+async def auth_tokens(client: AsyncClient, active_user: User) -> dict:
+    response = await client.post(LOGIN_URL, data={"username": TEST_EMAIL, "password": TEST_PASSWORD})
+    assert response.status_code == 200
+    return response.json()

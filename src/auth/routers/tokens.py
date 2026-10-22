@@ -18,7 +18,7 @@ from src.core.database import get_db
 router = APIRouter()
 
 
-@router.post("/token", description="Enter your email to 'username' field")
+@router.post("/token", description="Enter your email to 'username' field", summary="Login to get access and refresh tokens")
 async def login_for_access_token(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: AsyncSession = Depends(get_db),
@@ -72,7 +72,6 @@ async def token_refresh(
         data={"sub": db_token.user.email}, expires_delta=settings.ACCESS_TOKEN_LIFETIME
     )
 
-
     new_refresh_token = create_refresh_token()
     try:
         await db.delete(db_token)
@@ -103,5 +102,5 @@ async def users_logout(
         await db.rollback()
         raise HTTPException(status_code=400, detail="Failed to logout") from e
 
-    if result.rowcount == 0:
+    if result.rowcount == 0: # type: ignore
         raise HTTPException(status_code=401, detail="Invalid refresh token")
