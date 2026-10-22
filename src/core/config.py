@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     PAGINATION_DEFAULT_PER_PAGE: int = 10
     PAGINATION_MAX_PER_PAGE: int = 20
 
+    # --- Tests ---
+    TEST_DATABASE_URL: str = "sqlite+aiosqlite://"
+    TEST_DB_ECHO: bool = False
+
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env")
 
     @model_validator(mode="after")
