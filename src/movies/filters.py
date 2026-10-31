@@ -6,12 +6,18 @@ from enum import Enum
 from sqlalchemy.sql import or_
 
 
-from src.db.models import Movie, Star, Director
+from src.core.config import settings
+from src.movies.models import Movie, Star, Director
 
 
 class BasePagination(BaseModel):
     page: int = Field(1, ge=1, description="Page number")
-    per_page: int = Field(10, ge=1, le=20, description="Number of items per page")
+    per_page: int = Field(
+        settings.PAGINATION_DEFAULT_PER_PAGE,
+        ge=1,
+        le=settings.PAGINATION_MAX_PER_PAGE,
+        description="Number of items per page",
+    )
 
 
 class MovieFilter(BaseModel):
