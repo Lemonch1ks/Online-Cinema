@@ -131,14 +131,6 @@ async def test_no_login_without_password():
     assert smtp.sent
 
 
-@pytest.mark.xfail(
-    strict=True,
-    raises=BaseEmailError,
-    reason=(
-        "BUG in EmailSender._send_email: start_tls=True is passed to aiosmtplib.SMTP (STARTTLS on connect) "
-        "and then starttls() is called again -> 'Connection already using TLS'. Remove xfail after the fix."
-    ),
-)
 async def test_tls_connection_upgrades_once():
     await make_sender(use_tls=True).send_activation_email(RECIPIENT, LINK)
 
