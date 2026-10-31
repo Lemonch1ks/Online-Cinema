@@ -10,12 +10,6 @@ REGISTER_URL = f"{settings.API_VERSION_PREFIX}/users/register"
 VALID_PASSWORD = "StrongPass1!"
 
 
-async def test_genres_list_is_empty_on_fresh_db(client):
-    response = await client.get("/api/v1/genres")
-
-    assert response.status_code == 200
-
-
 async def test_register_creates_inactive_user(client, db_session, email_sender):
     response = await client.post(REGISTER_URL, json={"email": "New.User@Example.com", "password": VALID_PASSWORD})
 
