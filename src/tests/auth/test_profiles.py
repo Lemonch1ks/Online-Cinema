@@ -331,3 +331,16 @@ async def test_concurrent_profile_creation_returns_409_and_keeps_one_avatar(
     assert sorted(r.status_code for r in responses) == [201, 409]
     profile = await get_db_profile(db_session, active_user.id)
     assert list(storage.files) == [profile.avatar]
+
+
+async def test_concurrent_avatar_updates_leave_no_orphan_files(client, db_session, active_user, auth_headers, storage):
+    await create_profile(client, auth_headers, files=avatar_file())
+
+    responses = await asyncio.gather(*(
+        client.patch(PROFILE_URL, files=avatar_file(make_image("PNG", size=(8 + i, 8))), headers=auth_headers)
+        for i in range(2)
+    ))
+
+    assert [r.status_code for r in responses] == [200, 200]
+    profile = await get_db_profile(db_session, active_user.id)
+    assert list(storage.files) == [profile.avatar]

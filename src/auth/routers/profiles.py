@@ -27,8 +27,10 @@ PROFILE_NOT_FOUND = {404: {"description": "You have no profile yet."}}
 UPLOAD_FAILED = {500: {"description": "The avatar could not be uploaded or the profile could not be saved."}}
 
 
-async def get_profile(db: AsyncSession, user: User) -> UserProfile | None:
+async def get_profile(db: AsyncSession, user: User, for_update: bool = False) -> UserProfile | None:
     stmt = select(UserProfile).where(UserProfile.user_id == user.id)
+    if for_update:
+        stmt = stmt.with_for_update()
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
@@ -136,7 +138,7 @@ async def update_profile(
         db: AsyncSession = Depends(get_db),
         storage: S3Storage = Depends(get_storage),
 ) -> ProfileSchema:
-    profile = await get_profile(db, user)
+    profile = await get_profile(db, user, for_update=True)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="You have no profile yet.")
 
