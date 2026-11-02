@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import RefreshToken, User
 from src.auth.security import create_refresh_token, decode_access_token
@@ -103,6 +104,21 @@ async def test_concurrent_refresh_with_same_token_succeeds_only_once(client, db_
     assert sorted(r.status_code for r in responses) == [200, 401]
     stmt = select(RefreshToken).where(RefreshToken.user_id == active_user.id)
     assert len((await db_session.execute(stmt)).scalars().all()) == 1
+
+
+async def test_refresh_for_deleted_user_returns_401(client, db_session, active_user, auth_tokens, monkeypatch):
+    original_get = AsyncSession.get
+
+    async def user_deleted_meanwhile(self, entity, ident, *args, **kwargs):
+        if entity is User:
+            return None
+        return await original_get(self, entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "get", user_deleted_meanwhile)
+
+    response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
+
+    assert response.status_code == 401
 
 
 @pytest.mark.usefixtures("auth_tokens")

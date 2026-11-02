@@ -77,6 +77,9 @@ async def token_refresh(
         raise invalid_token
 
     user = await db.get(User, used_token.user_id)
+    if user is None:
+        await db.rollback()
+        raise invalid_token
     if not user.is_active:
         await db.rollback()
         raise HTTPException(status_code=403, detail="Inactive user")
