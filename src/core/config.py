@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = "Movie API"
     APP_VERSION: str = "1.0.0"
     APP_BASE_URL: str = "http://127.0.0.1:8000"
+    FRONTEND_URL: str | None = None
     API_VERSION_PREFIX: str = "/api/v1"
 
     # --- Database ---
@@ -109,7 +110,9 @@ class Settings(BaseSettings):
 
     @property
     def LOGIN_LINK_ENDPOINT(self) -> str:
-        return f"{self.APP_BASE_URL}{self.SECURITY_TOKEN_URL}/token"
+        if self.FRONTEND_URL:
+            return f"{self.FRONTEND_URL.rstrip('/')}/login"
+        return f"{self.APP_BASE_URL}/docs"
 
 
 settings = Settings() # type: ignore

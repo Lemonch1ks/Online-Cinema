@@ -58,6 +58,20 @@ def test_derived_urls_follow_api_prefix_and_base_url():
     assert custom.PASSWORD_RESET_LINK_ENDPOINT == "https://cinema.example/api/v2/accounts/password_reset"
 
 
+
+@pytest.mark.parametrize(
+    ("frontend_url", "expected"),
+    [
+        (None, "https://cinema.example/docs"),
+        ("https://app.example", "https://app.example/login"),
+        ("https://app.example/", "https://app.example/login"),
+    ],
+)
+def test_login_link_points_to_a_page(frontend_url, expected):
+    custom = make_settings(APP_BASE_URL="https://cinema.example", FRONTEND_URL=frontend_url)
+
+    assert custom.LOGIN_LINK_ENDPOINT == expected
+
 # --- database ---
 
 async def test_get_db_yields_session_and_closes_it():

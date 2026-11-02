@@ -1,3 +1,5 @@
+from urllib.parse import urlsplit
+
 import pytest
 from sqlalchemy import select
 
@@ -52,6 +54,16 @@ async def test_activate_with_valid_token_activates_user(client, db_session, emai
     assert inactive_user.is_active is True
     assert await get_activation_token(db_session, inactive_user.id) is None
     assert [email for email, _ in email_sender.activation_complete_emails] == [TEST_EMAIL]
+
+
+async def test_login_link_in_activation_complete_email_opens(client, db_session, email_sender, inactive_user):
+    token = await create_activation_token(db_session, inactive_user)
+    await client.get(f"{ACTIVATION_URL}{token.token}")
+    [(_, login_link)] = email_sender.activation_complete_emails
+
+    response = await client.get(urlsplit(login_link).path)
+
+    assert response.status_code == 200
 
 
 async def test_activate_with_unknown_token_returns_400(client, inactive_user):
