@@ -5,6 +5,7 @@ import pytest_asyncio
 from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy import insert, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
 from src.auth.models import User, UserGroup, UserGroupEnum
@@ -26,7 +27,7 @@ def database_url(worker_id: str) -> Generator[str, None, None]:
 
     The schema comes from the real migrations, so every test run also checks that they apply on Postgres.
     """
-    base_name = settings.TEST_DATABASE_URL.rsplit("/", 1)[-1]
+    base_name = make_url(settings.TEST_DATABASE_URL).database
     url = with_database(settings.TEST_DATABASE_URL, f"{base_name}_{worker_id}")
     create_database(url)
     alembic(url, ("upgrade", "head"))

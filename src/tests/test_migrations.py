@@ -4,6 +4,7 @@ Each test uses its own throwaway database, the per-worker test database is not t
 """
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from src.core.config import settings, to_sync_url
 from src.tests.db import alembic, create_database, drop_database, with_database
@@ -11,7 +12,7 @@ from src.tests.db import alembic, create_database, drop_database, with_database
 
 @pytest.fixture()
 def empty_database(worker_id: str):
-    base_name = settings.TEST_DATABASE_URL.rsplit("/", 1)[-1]
+    base_name = make_url(settings.TEST_DATABASE_URL).database
     url = with_database(settings.TEST_DATABASE_URL, f"{base_name}_migrations_{worker_id}")
     create_database(url)
     yield url
