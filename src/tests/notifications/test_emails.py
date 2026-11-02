@@ -1,4 +1,5 @@
 """Unit tests for the real EmailSender: real Jinja templates, fake SMTP connection."""
+
 from email import message_from_string
 
 import aiosmtplib
@@ -164,6 +165,6 @@ async def test_smtp_error_is_wrapped_in_base_email_error(fake_smtp, step):
         await make_sender().send_activation_email(RECIPIENT, LINK)
 
     [smtp] = FakeSMTP.instances
-    assert "sendmail" not in smtp.calls[smtp.calls.index(step) + 1:]
+    assert "sendmail" not in smtp.calls[smtp.calls.index(step) + 1 :]
     if step != "connect":
         assert smtp.closed, "the connection must be closed after a failed login/sendmail"

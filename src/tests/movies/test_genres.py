@@ -22,10 +22,19 @@ async def test_genres_list_counts_movies_including_empty_genres(client, catalog)
 
 
 async def test_genre_counts_with_a_movie_in_several_genres(client, db_session, catalog):
-    drama, comedy = (await db_session.execute(select(Genre).where(Genre.name.in_(["Drama", "Comedy"])).order_by(Genre.name))).scalars()
+    drama, comedy = (
+        await db_session.execute(select(Genre).where(Genre.name.in_(["Drama", "Comedy"])).order_by(Genre.name))
+    ).scalars()
     movie = Movie(
-        name="Dramedy", year=2015, time=95, imdb=7.1, votes=50, description="Funny and sad.",
-        price=Decimal("3.99"), certification_id=catalog["The Matrix"].certification_id, genres=[drama, comedy],
+        name="Dramedy",
+        year=2015,
+        time=95,
+        imdb=7.1,
+        votes=50,
+        description="Funny and sad.",
+        price=Decimal("3.99"),
+        certification_id=catalog["The Matrix"].certification_id,
+        genres=[drama, comedy],
     )
     db_session.add(movie)
     await db_session.commit()

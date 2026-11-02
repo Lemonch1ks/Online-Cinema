@@ -45,6 +45,7 @@ async def get_password_reset_token(db_session, user_id: int) -> PasswordResetTok
 
 # --- GET /activate/{token} ---
 
+
 async def test_activate_with_valid_token_activates_user(client, db_session, email_sender, inactive_user):
     token = await create_activation_token(db_session, inactive_user)
 
@@ -95,6 +96,7 @@ async def test_activated_user_can_log_in(client, db_session, inactive_user):
 
 
 # --- POST /activate/resend ---
+
 
 async def test_resend_replaces_existing_activation_token(client, db_session, email_sender, inactive_user):
     old_token = await create_activation_token(db_session, inactive_user, expired=True)
@@ -157,6 +159,7 @@ async def test_resend_invalid_payload_returns_422(client, payload):
 
 # --- POST /password_reset/request ---
 
+
 async def test_reset_request_creates_token_and_sends_email(client, db_session, email_sender, active_user):
     response = await client.post(PASSWORD_RESET_REQUEST_URL, json={"email": TEST_EMAIL})
 
@@ -181,7 +184,9 @@ async def test_reset_request_replaces_expired_token_with_a_working_one(client, d
     assert new_token.token != old_value
     [(_, link)] = email_sender.password_reset_emails
     assert link == f"{settings.PASSWORD_RESET_LINK_ENDPOINT}/{new_token.token}"
-    complete = await client.post(PASSWORD_RESET_COMPLETE_URL, json={"token": new_token.token, "new_password": NEW_PASSWORD})
+    complete = await client.post(
+        PASSWORD_RESET_COMPLETE_URL, json={"token": new_token.token, "new_password": NEW_PASSWORD}
+    )
     assert complete.status_code == 200
 
 
@@ -199,6 +204,7 @@ async def test_reset_request_response_is_same_for_all_emails(client, db_session,
 
 
 # --- GET /password_reset/{token} ---
+
 
 async def test_check_reset_token_valid_does_not_consume_it(client, db_session, active_user):
     token = await create_password_reset_token(db_session, active_user)
@@ -225,20 +231,19 @@ async def test_check_reset_token_expired_returns_400(client, db_session, active_
 
 # --- POST /password_reset/complete ---
 
+
 async def test_complete_reset_changes_password_and_revokes_tokens(
     client, db_session, email_sender, active_user, auth_tokens
 ):
     token = await create_password_reset_token(db_session, active_user)
 
-    response = await client.post(
-        PASSWORD_RESET_COMPLETE_URL, json={"token": token.token, "new_password": NEW_PASSWORD}
-    )
+    response = await client.post(PASSWORD_RESET_COMPLETE_URL, json={"token": token.token, "new_password": NEW_PASSWORD})
 
     assert response.status_code == 200
     assert await get_password_reset_token(db_session, active_user.id) is None
     refresh_tokens = (
-        await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == active_user.id))
-    ).scalars().all()
+        (await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == active_user.id))).scalars().all()
+    )
     assert refresh_tokens == []
     assert [email for email, _ in email_sender.password_reset_complete_emails] == [TEST_EMAIL]
 
@@ -268,9 +273,7 @@ async def test_complete_reset_with_unknown_token_returns_400(client, active_user
 async def test_complete_reset_with_expired_token_keeps_old_password(client, db_session, active_user):
     token = await create_password_reset_token(db_session, active_user, expired=True)
 
-    response = await client.post(
-        PASSWORD_RESET_COMPLETE_URL, json={"token": token.token, "new_password": NEW_PASSWORD}
-    )
+    response = await client.post(PASSWORD_RESET_COMPLETE_URL, json={"token": token.token, "new_password": NEW_PASSWORD})
 
     assert response.status_code == 400
     login = await client.post(LOGIN_URL, data={"username": TEST_EMAIL, "password": TEST_PASSWORD})
@@ -288,6 +291,7 @@ async def test_complete_reset_with_weak_password_returns_422(client, db_session,
 
 
 # --- end-to-end ---
+
 
 async def test_forgot_password_full_flow(client, email_sender, active_user):
     await client.post(PASSWORD_RESET_REQUEST_URL, json={"email": TEST_EMAIL})
@@ -311,7 +315,9 @@ async def test_forgot_password_full_flow(client, email_sender, active_user):
     ],
     ids=["resend-activation", "password-reset-request"],
 )
-async def test_concurrent_token_requests_both_succeed_with_one_token(client, db_session, url, user_is_active, get_token):
+async def test_concurrent_token_requests_both_succeed_with_one_token(
+    client, db_session, url, user_is_active, get_token
+):
     user = await create_user(db_session, is_active=user_is_active)
 
     responses = await asyncio.gather(*(client.post(url, json={"email": TEST_EMAIL}) for _ in range(2)))

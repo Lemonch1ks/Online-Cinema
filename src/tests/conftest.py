@@ -4,8 +4,8 @@ import pytest
 import pytest_asyncio
 from httpx2 import ASGITransport, AsyncClient
 from sqlalchemy import insert, text
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from src.auth.models import User, UserGroup, UserGroupEnum
@@ -22,7 +22,7 @@ TABLES = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
 
 
 @pytest.fixture(scope="session")
-def database_url(worker_id: str) -> Generator[str, None, None]:
+def database_url(worker_id: str) -> Generator[str]:
     """One database per xdist worker (cinema_test_gw0, ...; cinema_test_master without xdist).
 
     The schema comes from the real migrations, so every test run also checks that they apply on Postgres.
@@ -58,13 +58,12 @@ async def clean_database(engine: AsyncEngine) -> None:
 
 
 @pytest_asyncio.fixture()
-async def db_session(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession]:
     async with session_factory() as session:
         yield session
 
 
 class FakeEmailSender:
-
     def __init__(self) -> None:
         self.activation_emails: list[tuple[str, str]] = []
         self.activation_complete_emails: list[tuple[str, str]] = []
@@ -119,8 +118,8 @@ def storage() -> FakeStorage:
 @pytest_asyncio.fixture()
 async def client(
     email_sender: FakeEmailSender, storage: FakeStorage, session_factory: async_sessionmaker[AsyncSession]
-) -> AsyncGenerator[AsyncClient, None]:
-    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+) -> AsyncGenerator[AsyncClient]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession]:
         async with session_factory() as session:
             yield session
 

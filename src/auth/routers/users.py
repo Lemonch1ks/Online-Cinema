@@ -1,14 +1,14 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_active_user
-from src.auth.models import ActivationToken, RefreshToken, UserGroupEnum, UserGroup, User
-from src.auth.schemas import UserSchema, UserCreationSchema, UserChangePasswordSchema
+from src.auth.models import ActivationToken, RefreshToken, User, UserGroup, UserGroupEnum
+from src.auth.schemas import UserChangePasswordSchema, UserCreationSchema, UserSchema
 from src.auth.security import generate_token
 from src.auth.service import create_and_send_an_activation_link
 from src.core.config import settings
@@ -27,9 +27,9 @@ router = APIRouter()
     response_model=UserSchema,
 )
 async def register_user(
-        user_data: UserCreationSchema,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    user_data: UserCreationSchema,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> UserSchema:
 
     act_token = generate_token(settings.ACTIVATION_TOKEN_NBYTES)
@@ -41,14 +41,10 @@ async def register_user(
     if user:
         raise HTTPException(status_code=409, detail="User already exists")
 
-    stmt = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
-    result = await db.execute(stmt)
-    user_group = result.scalars().first()
+    group_stmt = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
+    user_group = (await db.execute(group_stmt)).scalars().first()
     if not user_group:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Default user group not found."
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Default user group not found.")
 
     try:
         new_user = User.create(
@@ -70,8 +66,7 @@ async def register_user(
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during user creation."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An error occurred during user creation."
         ) from e
 
     await create_and_send_an_activation_link(act_token=act_token, user=new_user, email_sender=email_sender)
@@ -84,9 +79,9 @@ async def register_user(
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def change_password(
-        user_data: UserChangePasswordSchema,
-        user: Annotated[User, Depends(get_current_active_user)],
-        db: AsyncSession = Depends(get_db),
+    user_data: UserChangePasswordSchema,
+    user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
 ):
     if not user.verify_password(user_data.old_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials.")
@@ -103,6 +98,5 @@ async def change_password(
         await db.rollback()
         logger.error(e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to change password."
-        )
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to change password."
+        ) from e

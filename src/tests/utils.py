@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from io import BytesIO
 
 from httpx2 import AsyncClient
@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.models import ActivationToken, PasswordResetToken, User, UserGroup, UserGroupEnum
 from src.auth.security import generate_token
 from src.core.config import settings
-
 
 TEST_EMAIL = "testuser@example.com"
 TEST_PASSWORD = "Testpassword1@"
@@ -67,7 +66,7 @@ def bearer(access_token: str) -> dict:
 
 
 def _expires_at(lifetime: timedelta, expired: bool) -> datetime:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return now - timedelta(hours=1) if expired else now + lifetime
 
 

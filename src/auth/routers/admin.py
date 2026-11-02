@@ -6,8 +6,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from src.auth.dependencies import require_role, get_current_active_user
-from src.auth.models import UserGroupEnum, User, UserGroup
+from src.auth.dependencies import get_current_active_user, require_role
+from src.auth.models import User, UserGroup, UserGroupEnum
 from src.auth.schemas import AdminChangeGroupSchema, AdminChangesUserSchema
 from src.core.config import settings
 from src.core.database import get_db
@@ -26,20 +26,24 @@ logger = logging.getLogger(__name__)
     response_model=AdminChangesUserSchema,
 )
 async def update_user_group(
-        user_id: int,
-        data: AdminChangeGroupSchema,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_active_user)
+    user_id: int,
+    data: AdminChangeGroupSchema,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     if user_id == current_user.id:
         raise HTTPException(status_code=403, detail="Cannot change itself group")
 
-    user = (await db.execute(select(User).where(User.id == user_id).options(joinedload(User.group)))).scalar_one_or_none()
+    user = (
+        await db.execute(select(User).where(User.id == user_id).options(joinedload(User.group)))
+    ).scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    db_new_group = (await db.execute(select(UserGroup).where(UserGroup.name == data.new_group_rank.name))).scalar_one_or_none()
+    db_new_group = (
+        await db.execute(select(UserGroup).where(UserGroup.name == data.new_group_rank.name))
+    ).scalar_one_or_none()
 
     if not db_new_group:
         raise HTTPException(status_code=404, detail="Group does not exist in db table")
@@ -61,11 +65,15 @@ async def update_user_group(
     summary="Activate user account",
 )
 async def activate_user_account(
-        user_id: int,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> AdminChangesUserSchema:
-    user = (await db.execute(select(User).where(User.id == user_id).options(joinedload(User.activation_token), joinedload(User.group)))).scalar_one_or_none()
+    user = (
+        await db.execute(
+            select(User).where(User.id == user_id).options(joinedload(User.activation_token), joinedload(User.group))
+        )
+    ).scalar_one_or_none()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

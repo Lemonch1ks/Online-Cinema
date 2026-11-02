@@ -15,16 +15,15 @@ MIN_BIRTH_YEAR = 1900
 def validate_password(password):
     if len(password) < settings.PASSWORD_MIN_LENGTH:
         raise ValueError(f"Password must contain at least {settings.PASSWORD_MIN_LENGTH} characters.")
-    if not re.search(r'[A-Z]', password):
+    if not re.search(r"[A-Z]", password):
         raise ValueError("Password must contain at least one uppercase letter.")
-    if not re.search(r'[a-z]', password):
+    if not re.search(r"[a-z]", password):
         raise ValueError("Password must contain at least one lower letter.")
-    if not re.search(r'\d', password):
+    if not re.search(r"\d", password):
         raise ValueError("Password must contain at least one digit.")
     if not re.search(f"[{re.escape(settings.PASSWORD_SPECIAL_CHARS)}]", password):
         raise ValueError(
-            "Password must contain at least one special character: "
-            f"{', '.join(settings.PASSWORD_SPECIAL_CHARS)}."
+            f"Password must contain at least one special character: {', '.join(settings.PASSWORD_SPECIAL_CHARS)}."
         )
     return password
 
@@ -34,7 +33,7 @@ def validate_email(user_email: str) -> str:
         email_info = email_validator.validate_email(user_email, check_deliverability=False)
         email = email_info.normalized
     except email_validator.EmailNotValidError as error:
-        raise ValueError(str(error))
+        raise ValueError(str(error)) from error
     else:
         return email
 

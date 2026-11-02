@@ -1,4 +1,5 @@
 """Database errors on commit: endpoints must roll back and answer with an error instead of crashing."""
+
 import pytest
 from sqlalchemy import Delete, delete, select
 from sqlalchemy.exc import OperationalError
@@ -149,9 +150,7 @@ async def test_refresh_returns_500_when_token_delete_fails(client, db_session, a
 async def test_logout_returns_500_on_db_error(client, db_session, auth_tokens, auth_headers, broken_commit):
     broken_commit()
 
-    response = await client.post(
-        LOGOUT_URL, json={"refresh_token": auth_tokens["refresh_token"]}, headers=auth_headers
-    )
+    response = await client.post(LOGOUT_URL, json={"refresh_token": auth_tokens["refresh_token"]}, headers=auth_headers)
 
     assert response.status_code == 500
     stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])

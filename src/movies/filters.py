@@ -1,15 +1,12 @@
+from enum import Enum
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Select, desc, asc
-
-from enum import Enum
-
+from sqlalchemy import Select, asc, desc
 from sqlalchemy.sql import or_
 
-
 from src.core.config import settings
-from src.movies.models import Movie, Star, Director
+from src.movies.models import Director, Movie, Star
 
 
 class BasePagination(BaseModel):
@@ -84,23 +81,19 @@ class MovieSort(BaseModel):
     order_type: OrderTypeEnum = Field(OrderTypeEnum.desc, description="Order type")
     sort_by: SortByEnum | None = Field(None, description="Sort by an attribute")
 
-
     def sort(self, stmt: Select) -> Select:
 
         sort_types = {
             SortByEnum.imdb: Movie.imdb,
             SortByEnum.meta_score: Movie.meta_score,
             SortByEnum.year: Movie.year,
-            SortByEnum.gross: Movie.gross
+            SortByEnum.gross: Movie.gross,
         }
 
-        order = {
-            OrderTypeEnum.desc: desc,
-            OrderTypeEnum.asc: asc
-        }
+        order = {OrderTypeEnum.desc: desc, OrderTypeEnum.asc: asc}
 
         if self.sort_by is not None:
-            return stmt.order_by(order[self.order_type](sort_types.get(self.sort_by)).nulls_last())
+            return stmt.order_by(order[self.order_type](sort_types[self.sort_by]).nulls_last())
 
         return stmt
 

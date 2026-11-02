@@ -2,6 +2,7 @@
 
 Each test uses its own throwaway database, the per-worker test database is not touched.
 """
+
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -47,10 +48,12 @@ def test_downgrade_refuses_to_remove_groups_that_users_belong_to(empty_database)
     alembic(empty_database, ("upgrade", "head"))
     engine = create_engine(to_sync_url(empty_database))
     with engine.begin() as conn:
-        conn.execute(text(
-            "insert into users (email, hashed_password, is_active, group_id) "
-            "values ('kept@example.com', 'x', true, (select id from user_groups where name = 'USER'))"
-        ))
+        conn.execute(
+            text(
+                "insert into users (email, hashed_password, is_active, group_id) "
+                "values ('kept@example.com', 'x', true, (select id from user_groups where name = 'USER'))"
+            )
+        )
     engine.dispose()
 
     with pytest.raises(RuntimeError, match="users"):

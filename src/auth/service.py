@@ -1,14 +1,14 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy.orm import joinedload
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 
-from src.auth.models import User, ActivationToken, PasswordResetToken
+from src.auth.models import ActivationToken, PasswordResetToken, User
 from src.auth.security import DUMMY_HASH, verify_password
 from src.core.config import settings
-from src.notifications.emails import EmailSender, BaseEmailError
+from src.notifications.emails import BaseEmailError, EmailSender
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 
 
 def validate_token_by_time(token: ActivationToken | PasswordResetToken) -> bool:
-    if token.expires_at < datetime.now(timezone.utc):
+    if token.expires_at < datetime.now(UTC):
         return False
     return True
 

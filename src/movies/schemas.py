@@ -1,9 +1,7 @@
-from datetime import date
 from decimal import Decimal
-from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 
 class SideSchema(BaseModel):
@@ -48,9 +46,9 @@ class MovieListItemSchema(MovieBaseSchema):
 
 
 class MovieListResponseSchema(BaseModel):
-    movies: List[MovieListItemSchema]
-    next_page: Optional[str]
-    prev_page: Optional[str]
+    movies: list[MovieListItemSchema]
+    next_page: str | None
+    prev_page: str | None
     total_pages: int
     total_items: int
 
@@ -74,12 +72,12 @@ class GenreItemSchema(BaseModel):
 
 
 class GenreListResponseSchema(BaseModel):
-    genres: List[GenreItemSchema]
+    genres: list[GenreItemSchema]
 
 
 class GenreDetailItemSchema(BaseModel):
     id: int
     name: str
-    movies: List[MovieListItemSchema]
+    movies: list[MovieListItemSchema]
 
     model_config = {"from_attributes": True}

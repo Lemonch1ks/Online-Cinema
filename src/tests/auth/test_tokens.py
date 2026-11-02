@@ -1,17 +1,28 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import RefreshToken, User
 from src.auth.security import create_refresh_token, decode_access_token
-from src.tests.utils import CHANGE_PASSWORD_URL, LOGIN_URL, REFRESH_URL, TEST_EMAIL, TEST_PASSWORD, bearer, create_user, LOGOUT_URL
+from src.tests.utils import (
+    CHANGE_PASSWORD_URL,
+    LOGIN_URL,
+    LOGOUT_URL,
+    REFRESH_URL,
+    TEST_EMAIL,
+    TEST_PASSWORD,
+    bearer,
+    create_user,
+)
 
 LOGIN_PAYLOAD = {"username": TEST_EMAIL, "password": TEST_PASSWORD}
 
 
 # --- /token ---
+
 
 async def test_login_returns_tokens_and_stores_refresh_token(client, db_session, active_user):
     response = await client.post(LOGIN_URL, data=LOGIN_PAYLOAD)
@@ -56,6 +67,7 @@ async def test_login_inactive_user_returns_403(client, db_session):
 
 # --- /refresh ---
 
+
 async def test_refresh_rotates_refresh_token(client, auth_tokens):
     old_payload = {"refresh_token": auth_tokens["refresh_token"]}
 
@@ -94,6 +106,21 @@ async def test_concurrent_refresh_with_same_token_succeeds_only_once(client, db_
     assert len((await db_session.execute(stmt)).scalars().all()) == 1
 
 
+async def test_refresh_for_deleted_user_returns_401(client, db_session, active_user, auth_tokens, monkeypatch):
+    original_get = AsyncSession.get
+
+    async def user_deleted_meanwhile(self, entity, ident, *args, **kwargs):
+        if entity is User:
+            return None
+        return await original_get(self, entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "get", user_deleted_meanwhile)
+
+    response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
+
+    assert response.status_code == 401
+
+
 @pytest.mark.usefixtures("auth_tokens")
 async def test_refresh_with_unknown_token_returns_401(client):
     response = await client.post(REFRESH_URL, json={"refresh_token": "not-a-real-token"})
@@ -105,7 +132,7 @@ async def test_refresh_with_expired_token_returns_401(client, db_session, active
     expired_token = RefreshToken(
         token=create_refresh_token(),
         user_id=active_user.id,
-        expires_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        expires_at=datetime.now(UTC) - timedelta(hours=1),
     )
     db_session.add(expired_token)
     await db_session.commit()
@@ -121,6 +148,7 @@ async def get_refresh_token_from_db(db_session, token: str) -> RefreshToken | No
 
 
 # --- /logout ---
+
 
 async def test_logout_deletes_refresh_token(client, db_session, auth_tokens, auth_headers):
     payload = {"refresh_token": auth_tokens["refresh_token"]}

@@ -1,5 +1,5 @@
-import logging
 import asyncio
+import logging
 import re
 import struct
 import zlib
@@ -25,6 +25,7 @@ PROFILE_DATA = {
 
 def png_header_only(width: int, height: int) -> bytes:
     """A tiny PNG that only declares its size: unpacking it would need width * height * 3 bytes of memory."""
+
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
 
@@ -60,6 +61,7 @@ def broken_commit(monkeypatch):
 
 # --- POST /profiles/me ---
 
+
 async def test_create_profile_without_avatar(client, db_session, active_user, auth_headers, storage):
     response = await create_profile(client, auth_headers)
 
@@ -72,7 +74,9 @@ async def test_create_profile_without_avatar(client, db_session, active_user, au
     assert storage.files == {}
 
 
-@pytest.mark.parametrize(("image_format", "extension", "content_type"), [("PNG", "png", "image/png"), ("JPEG", "jpg", "image/jpeg")])
+@pytest.mark.parametrize(
+    ("image_format", "extension", "content_type"), [("PNG", "png", "image/png"), ("JPEG", "jpg", "image/jpeg")]
+)
 async def test_create_profile_with_avatar(
     client, db_session, active_user, auth_headers, storage, image_format, extension, content_type
 ):
@@ -90,7 +94,9 @@ async def test_create_profile_with_avatar(
 
 
 async def test_avatar_format_comes_from_content_not_from_client_metadata(client, auth_headers, storage):
-    response = await create_profile(client, auth_headers, files=avatar_file(make_image("PNG"), "photo.jpg", "image/jpeg"))
+    response = await create_profile(
+        client, auth_headers, files=avatar_file(make_image("PNG"), "photo.jpg", "image/jpeg")
+    )
 
     assert response.status_code == 201
     [(key, (_, stored_type))] = storage.files.items()
@@ -128,7 +134,9 @@ async def test_create_profile_twice_returns_409(client, auth_headers, storage):
         {"info": "x" * 1001},
     ],
 )
-async def test_create_profile_with_invalid_fields_returns_422(client, db_session, active_user, auth_headers, storage, data):
+async def test_create_profile_with_invalid_fields_returns_422(
+    client, db_session, active_user, auth_headers, storage, data
+):
     response = await create_profile(client, auth_headers, data={**PROFILE_DATA, **data}, files=avatar_file())
 
     assert response.status_code == 422
@@ -145,7 +153,9 @@ async def test_create_profile_with_invalid_fields_returns_422(client, db_session
     ],
     ids=["text-named-png", "truncated-png", "gif"],
 )
-async def test_create_profile_with_invalid_avatar_returns_422(client, db_session, active_user, auth_headers, storage, data, message):
+async def test_create_profile_with_invalid_avatar_returns_422(
+    client, db_session, active_user, auth_headers, storage, data, message
+):
     response = await create_profile(client, auth_headers, files=avatar_file(data, "avatar.png", "image/png"))
 
     assert response.status_code == 422
@@ -182,7 +192,9 @@ async def test_create_profile_with_too_big_avatar_returns_422(client, auth_heade
     assert storage.files == {}
 
 
-async def test_create_profile_when_storage_is_down_returns_500(client, db_session, active_user, auth_headers, storage, caplog):
+async def test_create_profile_when_storage_is_down_returns_500(
+    client, db_session, active_user, auth_headers, storage, caplog
+):
     storage.fail_upload = True
 
     with caplog.at_level(logging.ERROR):
@@ -212,6 +224,7 @@ async def test_create_profile_db_error_without_avatar(client, auth_headers, stor
 
 # --- GET /profiles/me ---
 
+
 async def test_read_profile(client, auth_headers, storage):
     created = (await create_profile(client, auth_headers, files=avatar_file())).json()
 
@@ -229,10 +242,13 @@ async def test_read_profile_when_none_returns_404(client, auth_headers):
 
 # --- PATCH /profiles/me ---
 
+
 async def test_update_profile_changes_only_sent_fields(client, db_session, active_user, auth_headers):
     await create_profile(client, auth_headers)
 
-    response = await client.patch(PROFILE_URL, data={"info": "Now into documentaries.", "gender": "MAN"}, headers=auth_headers)
+    response = await client.patch(
+        PROFILE_URL, data={"info": "Now into documentaries.", "gender": "MAN"}, headers=auth_headers
+    )
 
     assert response.status_code == 200
     body = response.json()
@@ -241,14 +257,22 @@ async def test_update_profile_changes_only_sent_fields(client, db_session, activ
     assert body["first_name"] == PROFILE_DATA["first_name"]
     assert body["date_of_birth"] == PROFILE_DATA["date_of_birth"]
     saved = await get_db_profile(db_session, active_user.id)
-    assert (saved.info, saved.gender.value, saved.first_name) == ("Now into documentaries.", "MAN", PROFILE_DATA["first_name"])
+    assert (saved.info, saved.gender.value, saved.first_name) == (
+        "Now into documentaries.",
+        "MAN",
+        PROFILE_DATA["first_name"],
+    )
 
 
-async def test_update_profile_replaces_avatar_and_deletes_old_file(client, db_session, active_user, auth_headers, storage):
+async def test_update_profile_replaces_avatar_and_deletes_old_file(
+    client, db_session, active_user, auth_headers, storage
+):
     old_url = (await create_profile(client, auth_headers, files=avatar_file())).json()["avatar_url"]
     [old_key] = storage.files
 
-    response = await client.patch(PROFILE_URL, files=avatar_file(make_image("JPEG"), "new.jpg", "image/jpeg"), headers=auth_headers)
+    response = await client.patch(
+        PROFILE_URL, files=avatar_file(make_image("JPEG"), "new.jpg", "image/jpeg"), headers=auth_headers
+    )
 
     assert response.status_code == 200
     [new_key] = storage.files
@@ -291,7 +315,9 @@ async def test_update_profile_with_invalid_field_returns_422(client, db_session,
     assert (await get_db_profile(db_session, active_user.id)).first_name == PROFILE_DATA["first_name"]
 
 
-async def test_update_profile_db_error_keeps_old_avatar(client, db_session, active_user, auth_headers, storage, broken_commit):
+async def test_update_profile_db_error_keeps_old_avatar(
+    client, db_session, active_user, auth_headers, storage, broken_commit
+):
     await create_profile(client, auth_headers, files=avatar_file())
     [old_key] = storage.files
     broken_commit()
@@ -327,6 +353,7 @@ async def test_update_profile_succeeds_if_old_avatar_cannot_be_deleted(client, a
 
 # --- auth ---
 
+
 @pytest.mark.parametrize("method", ["get", "post", "patch"])
 async def test_profile_endpoints_require_auth(client, method):
     response = await client.request(method.upper(), PROFILE_URL)
@@ -347,10 +374,12 @@ async def test_concurrent_profile_creation_returns_409_and_keeps_one_avatar(
 async def test_concurrent_avatar_updates_leave_no_orphan_files(client, db_session, active_user, auth_headers, storage):
     await create_profile(client, auth_headers, files=avatar_file())
 
-    responses = await asyncio.gather(*(
-        client.patch(PROFILE_URL, files=avatar_file(make_image("PNG", size=(8 + i, 8))), headers=auth_headers)
-        for i in range(2)
-    ))
+    responses = await asyncio.gather(
+        *(
+            client.patch(PROFILE_URL, files=avatar_file(make_image("PNG", size=(8 + i, 8))), headers=auth_headers)
+            for i in range(2)
+        )
+    )
 
     assert [r.status_code for r in responses] == [200, 200]
     profile = await get_db_profile(db_session, active_user.id)

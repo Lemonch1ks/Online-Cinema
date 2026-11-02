@@ -1,10 +1,10 @@
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import update
 
 from src.core.config import settings
-from src.movies.models import Director, Genre, Movie, Star
+from src.movies.models import Movie, Star
 from src.tests.utils import MOVIES_URL
 
 
@@ -69,8 +69,15 @@ async def test_movies_per_page_maximum_is_accepted(client, catalog):
 
 def make_movie(catalog, name: str, year: int, **extra) -> Movie:
     return Movie(
-        name=name, year=year, time=100, imdb=7.0, votes=10, description=f"{name} description.",
-        price=Decimal("4.99"), certification_id=catalog["The Matrix"].certification_id, **extra,
+        name=name,
+        year=year,
+        time=100,
+        imdb=7.0,
+        votes=10,
+        description=f"{name} description.",
+        price=Decimal("4.99"),
+        certification_id=catalog["The Matrix"].certification_id,
+        **extra,
     )
 
 
@@ -134,6 +141,7 @@ async def test_movies_invalid_query_returns_422(client, catalog, params):
 
 # --- filters ---
 
+
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
@@ -172,6 +180,7 @@ async def test_movies_filter_without_matches_returns_empty_page(client, catalog)
 
 # --- sorting ---
 
+
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
@@ -193,8 +202,16 @@ async def test_movies_sorting(client, catalog, params, expected):
 async def movie_without_scores(db_session, catalog) -> Movie:
     matrix = catalog["The Matrix"]
     movie = Movie(
-        name="Unknown Indie", year=2005, time=90, imdb=7.0, votes=10, meta_score=None, gross=None,
-        description="No box office data.", price=Decimal("1.99"), certification_id=matrix.certification_id,
+        name="Unknown Indie",
+        year=2005,
+        time=90,
+        imdb=7.0,
+        votes=10,
+        meta_score=None,
+        gross=None,
+        description="No box office data.",
+        price=Decimal("1.99"),
+        certification_id=matrix.certification_id,
     )
     db_session.add(movie)
     await db_session.commit()
@@ -204,10 +221,22 @@ async def movie_without_scores(db_session, catalog) -> Movie:
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"sort_by": "meta_score", "order_type": "desc"}, ["Inception", "Forrest Gump", "Cast Away", "The Matrix", "Unknown Indie"]),
-        ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception", "Unknown Indie"]),
-        ({"sort_by": "gross", "order_type": "desc"}, ["Forrest Gump", "Inception", "Cast Away", "The Matrix", "Unknown Indie"]),
-        ({"sort_by": "gross", "order_type": "asc"}, ["The Matrix", "Cast Away", "Inception", "Forrest Gump", "Unknown Indie"]),
+        (
+            {"sort_by": "meta_score", "order_type": "desc"},
+            ["Inception", "Forrest Gump", "Cast Away", "The Matrix", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "meta_score", "order_type": "asc"},
+            ["The Matrix", "Cast Away", "Forrest Gump", "Inception", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "gross", "order_type": "desc"},
+            ["Forrest Gump", "Inception", "Cast Away", "The Matrix", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "gross", "order_type": "asc"},
+            ["The Matrix", "Cast Away", "Inception", "Forrest Gump", "Unknown Indie"],
+        ),
     ],
 )
 async def test_movies_sorting_puts_null_values_last(client, movie_without_scores, params, expected):
@@ -230,6 +259,7 @@ async def test_movies_sorting_applies_before_pagination(client, catalog):
 
 
 # --- search ---
+
 
 @pytest.mark.parametrize(
     ("search", "expected"),
@@ -276,6 +306,7 @@ async def test_search_matching_several_stars_of_one_movie_returns_it_once(client
 
 
 # --- GET /movies/{movie_id} ---
+
 
 async def test_movie_details(client, catalog):
     movie = catalog["The Matrix"]
