@@ -66,7 +66,7 @@ async def token_refresh(
         used_token = (await db.execute(stmt)).one_or_none()
     except DatabaseError as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Failed to refresh token") from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to refresh token") from e
 
     if used_token is None:
         raise invalid_token
@@ -88,7 +88,7 @@ async def token_refresh(
         await db.commit()
     except DatabaseError as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Failed to refresh token") from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to refresh token") from e
 
     return Token(access_token=access_token, token_type="bearer", refresh_token=new_refresh_token)
 
@@ -109,7 +109,7 @@ async def users_logout(
         await db.commit()
     except DatabaseError as e:
         await db.rollback()
-        raise HTTPException(status_code=400, detail="Failed to logout") from e
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to logout") from e
 
     if result.rowcount == 0: # type: ignore
         raise HTTPException(status_code=401, detail="Invalid refresh token")

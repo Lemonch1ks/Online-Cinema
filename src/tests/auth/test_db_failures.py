@@ -119,17 +119,17 @@ async def test_change_password_returns_500_on_db_error(client, auth_headers, bro
     await login(client)
 
 
-async def test_refresh_returns_400_on_db_error(client, db_session, auth_tokens, broken_commit):
+async def test_refresh_returns_500_on_db_error(client, db_session, auth_tokens, broken_commit):
     broken_commit()
 
     response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
 
-    assert response.status_code == 400
+    assert response.status_code == 500
     stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])
     assert (await db_session.execute(stmt)).scalar_one_or_none() is not None
 
 
-async def test_refresh_returns_400_when_token_delete_fails(client, db_session, auth_tokens, monkeypatch):
+async def test_refresh_returns_500_when_token_delete_fails(client, db_session, auth_tokens, monkeypatch):
     original_execute = AsyncSession.execute
 
     async def failing_delete(self, statement, *args, **kwargs):
@@ -141,19 +141,21 @@ async def test_refresh_returns_400_when_token_delete_fails(client, db_session, a
 
     response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
 
-    assert response.status_code == 400
+    assert response.status_code == 500
     stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])
     assert (await db_session.execute(stmt)).scalar_one_or_none() is not None
 
 
-async def test_logout_returns_400_on_db_error(client, auth_tokens, auth_headers, broken_commit):
+async def test_logout_returns_500_on_db_error(client, db_session, auth_tokens, auth_headers, broken_commit):
     broken_commit()
 
     response = await client.post(
         LOGOUT_URL, json={"refresh_token": auth_tokens["refresh_token"]}, headers=auth_headers
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 500
+    stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])
+    assert (await db_session.execute(stmt)).scalar_one_or_none() is not None
 
 
 @pytest.fixture()
