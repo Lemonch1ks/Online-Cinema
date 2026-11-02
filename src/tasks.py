@@ -12,7 +12,7 @@ from src.core.database import SyncSessionLocal
 
 logger = get_task_logger(__name__)
 
-app = Celery('tasks', broker=settings.BROKER_URL)
+app = Celery('tasks', broker=settings.BROKER_URL, include=['src.notifications.tasks'])
 
 
 @app.on_after_configure.connect

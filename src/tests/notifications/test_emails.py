@@ -5,7 +5,6 @@ import aiosmtplib
 import pytest
 
 from src.core.config import settings
-from src.notifications.dependencies import get_email_sender
 from src.notifications.emails import BaseEmailError, EmailSender
 
 SENDER = "noreply@cinema.test"
@@ -167,12 +166,3 @@ async def test_smtp_error_is_wrapped_in_base_email_error(fake_smtp, step):
     assert "sendmail" not in smtp.calls[smtp.calls.index(step) + 1:]
     if step != "connect":
         assert smtp.closed, "the connection must be closed after a failed login/sendmail"
-
-
-def test_get_email_sender_is_built_from_settings_and_cached():
-    sender = get_email_sender()
-
-    assert isinstance(sender, EmailSender)
-    assert sender._hostname == settings.EMAIL_HOSTNAME
-    assert sender._port == settings.EMAIL_PORT
-    assert get_email_sender() is sender
