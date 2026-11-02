@@ -143,12 +143,13 @@ async def movie_without_scores(db_session, catalog) -> Movie:
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"sort_by": "meta_score", "order_type": "desc"}, ["Unknown Indie", "Inception", "Forrest Gump", "Cast Away", "The Matrix"]),
+        ({"sort_by": "meta_score", "order_type": "desc"}, ["Inception", "Forrest Gump", "Cast Away", "The Matrix", "Unknown Indie"]),
         ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception", "Unknown Indie"]),
-        ({"sort_by": "gross", "order_type": "desc"}, ["Unknown Indie", "Forrest Gump", "Inception", "Cast Away", "The Matrix"]),
+        ({"sort_by": "gross", "order_type": "desc"}, ["Forrest Gump", "Inception", "Cast Away", "The Matrix", "Unknown Indie"]),
+        ({"sort_by": "gross", "order_type": "asc"}, ["The Matrix", "Cast Away", "Inception", "Forrest Gump", "Unknown Indie"]),
     ],
 )
-async def test_movies_sorting_with_null_values(client, movie_without_scores, params, expected):
+async def test_movies_sorting_puts_null_values_last(client, movie_without_scores, params, expected):
     response = await client.get(MOVIES_URL, params=params)
 
     assert names(response) == expected

@@ -91,7 +91,7 @@ class MovieSort(BaseModel):
         }
 
         if self.sort_by is not None:
-            return stmt.order_by(order[self.order_type](sort_types.get(self.sort_by)))
+            return stmt.order_by(order[self.order_type](sort_types.get(self.sort_by)).nulls_last())
 
         return stmt
 
