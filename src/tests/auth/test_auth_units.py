@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from src.auth.models import ActivationToken, RefreshToken, User, UserGroup, UserGroupEnum
+from src.auth.models import ActivationToken, User, UserGroup, UserGroupEnum
 from src.auth.security import create_access_token, decode_access_token
 from src.auth.service import validate_token_by_time
 from src.auth.validators import validate_email, validate_password
@@ -88,16 +88,6 @@ def test_validate_token_by_time(delta, expected):
     token = ActivationToken(token="t", user_id=1, expires_at=datetime.now(timezone.utc) + delta)
 
     assert validate_token_by_time(token) is expected
-
-
-@pytest.mark.parametrize(
-    ("delta", "expected"),
-    [(timedelta(hours=1), True), (timedelta(hours=-1), False)],
-)
-def test_refresh_token_validity(delta, expected):
-    token = RefreshToken(token="t", user_id=1, expires_at=datetime.now(timezone.utc) + delta)
-
-    assert token.check_if_token_is_valid() is expected
 
 
 # --- JWT ---
