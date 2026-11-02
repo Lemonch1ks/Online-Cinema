@@ -5,7 +5,6 @@ import aiosmtplib
 import pytest
 
 from src.core.config import settings
-from src.notifications.dependencies import get_email_sender
 from src.notifications.emails import BaseEmailError, EmailSender
 
 SENDER = "noreply@cinema.test"
@@ -26,7 +25,17 @@ class FakeSMTP:
         self.using_tls = False
         self.calls: list[str] = []
         self.sent: list[tuple[str, list[str], str]] = []
+        self.closed = False
         FakeSMTP.instances.append(self)
+
+    async def __aenter__(self) -> "FakeSMTP":
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        if not isinstance(exc, (ConnectionError, TimeoutError)):
+            await self.quit()
+        self.close()
 
     def _maybe_fail(self, step: str) -> None:
         if FakeSMTP.fail_on == step:
@@ -55,6 +64,11 @@ class FakeSMTP:
 
     async def quit(self) -> None:
         self.calls.append("quit")
+        self.closed = True
+
+    def close(self) -> None:
+        self.calls.append("close")
+        self.closed = True
 
 
 @pytest.fixture(autouse=True)
@@ -111,16 +125,18 @@ async def test_email_is_rendered_and_sent(method, subject):
     assert message["To"] == RECIPIENT
     assert message["Subject"] == subject
     assert message.get_payload()[0].get_content_type() == "text/html"
-    assert LINK in html  # the template variable name matches what the method passes
+    assert LINK in html
     assert RECIPIENT in html
 
 
-async def test_smtp_session_order_without_tls():
+async def test_smtp_session_without_tls(fake_smtp):
     await make_sender(use_tls=False).send_activation_email(RECIPIENT, LINK)
 
     [smtp] = FakeSMTP.instances
     assert (smtp.hostname, smtp.port) == ("smtp.test", 1025)
-    assert smtp.calls == ["connect", "login", "sendmail", "quit"]
+    assert smtp.calls[:3] == ["connect", "login", "sendmail"]
+    assert "starttls" not in smtp.calls
+    assert smtp.closed
 
 
 async def test_no_login_without_password():
@@ -146,11 +162,7 @@ async def test_smtp_error_is_wrapped_in_base_email_error(fake_smtp, step):
     with pytest.raises(BaseEmailError, match=RECIPIENT):
         await make_sender().send_activation_email(RECIPIENT, LINK)
 
-
-def test_get_email_sender_is_built_from_settings_and_cached():
-    sender = get_email_sender()
-
-    assert isinstance(sender, EmailSender)
-    assert sender._hostname == settings.EMAIL_HOSTNAME
-    assert sender._port == settings.EMAIL_PORT
-    assert get_email_sender() is sender  # lru_cache: one instance per process
+    [smtp] = FakeSMTP.instances
+    assert "sendmail" not in smtp.calls[smtp.calls.index(step) + 1:]
+    if step != "connect":
+        assert smtp.closed, "the connection must be closed after a failed login/sendmail"

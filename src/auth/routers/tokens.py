@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi.security import OAuth2PasswordRequestForm
@@ -5,7 +6,6 @@ from fastapi import Depends, HTTPException, status, APIRouter
 from sqlalchemy import insert, select, delete
 from sqlalchemy.exc import DatabaseError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from src.auth.dependencies import get_current_active_user
 from src.auth.models import User, RefreshToken
@@ -51,31 +51,40 @@ async def login_for_access_token(
 async def token_refresh(
         current_token: TokenVerifySchema, db: AsyncSession = Depends(get_db),
 ) -> Token:
-    stmt = (
-        select(RefreshToken)
-        .where(RefreshToken.token == current_token.refresh_token)
-        .options(selectinload(RefreshToken.user))
+    invalid_token = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-    db_token = (await db.execute(stmt)).scalar_one_or_none()
 
-    if not db_token or not db_token.check_if_token_is_valid():
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    stmt = (
+        delete(RefreshToken)
+        .where(RefreshToken.token == current_token.refresh_token)
+        .returning(RefreshToken.user_id, RefreshToken.expires_at)
+    )
+    try:
+        used_token = (await db.execute(stmt)).one_or_none()
+    except DatabaseError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Failed to refresh token") from e
 
-    if not db_token.user.is_active:
+    if used_token is None:
+        raise invalid_token
+
+    if used_token.expires_at < datetime.now(timezone.utc):
+        await db.rollback()
+        raise invalid_token
+
+    user = await db.get(User, used_token.user_id)
+    if not user.is_active:
+        await db.rollback()
         raise HTTPException(status_code=403, detail="Inactive user")
 
-    access_token = create_access_token(
-        data={"sub": db_token.user.email}, expires_delta=settings.ACCESS_TOKEN_LIFETIME
-    )
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=settings.ACCESS_TOKEN_LIFETIME)
 
     new_refresh_token = create_refresh_token()
     try:
-        await db.delete(db_token)
-        db.add(RefreshToken(token=new_refresh_token, user_id=db_token.user_id))
+        db.add(RefreshToken(token=new_refresh_token, user_id=user.id))
         await db.commit()
     except DatabaseError as e:
         await db.rollback()

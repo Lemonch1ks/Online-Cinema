@@ -1,7 +1,5 @@
 FROM python:3.14-slim
 
-# Print logs immediately, do not write .pyc files.
-# Poetry installs straight into the image's Python: the container is already isolated, no venv needed.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     POETRY_VERSION=2.5.1 \

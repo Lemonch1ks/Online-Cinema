@@ -40,7 +40,7 @@ async def test_change_password_with_wrong_old_password_returns_400(client, auth_
     )
 
     assert response.status_code == 400
-    await login(client)  # old password still works
+    await login(client)
 
 
 async def test_change_password_to_same_password_returns_400(client, auth_headers):

@@ -11,7 +11,6 @@ from alembic import op
 import sqlalchemy as sa
 
 
-# revision identifiers, used by Alembic.
 revision: str = 'ea86cc9694ae'
 down_revision: Union[str, Sequence[str], None] = '33087ecbf422'
 branch_labels: Union[str, Sequence[str], None] = None
@@ -96,8 +95,6 @@ def downgrade() -> None:
     op.drop_table('user_groups')
     # ### end Alembic commands ###
 
-    # Autogenerate does not drop enum types. On PostgreSQL they are separate objects that outlive the
-    # tables, and the next upgrade would fail with 'type "usergroupenum" already exists'.
     bind = op.get_bind()
     sa.Enum(name='genderenum').drop(bind, checkfirst=True)
     sa.Enum(name='usergroupenum').drop(bind, checkfirst=True)

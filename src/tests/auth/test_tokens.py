@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -5,7 +6,7 @@ from sqlalchemy import select
 
 from src.auth.models import RefreshToken, User
 from src.auth.security import create_refresh_token
-from src.tests.utils import LOGIN_URL, REFRESH_URL, TEST_EMAIL, TEST_PASSWORD, create_user, LOGOUT_URL
+from src.tests.utils import CHANGE_PASSWORD_URL, LOGIN_URL, REFRESH_URL, TEST_EMAIL, TEST_PASSWORD, bearer, create_user, LOGOUT_URL
 
 LOGIN_PAYLOAD = {"username": TEST_EMAIL, "password": TEST_PASSWORD}
 
@@ -66,6 +67,30 @@ async def test_refresh_rotates_refresh_token(client, auth_tokens):
 
     response_with_old_token = await client.post(REFRESH_URL, json=old_payload)
     assert response_with_old_token.status_code == 401
+
+
+async def test_tokens_issued_by_refresh_work(client, auth_tokens):
+    new_tokens = (await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})).json()
+
+    assert new_tokens["token_type"] == "bearer"
+    protected = await client.post(
+        CHANGE_PASSWORD_URL,
+        json={"old_password": "WrongPassword1!", "new_password": "NewStrongPass2!"},
+        headers=bearer(new_tokens["access_token"]),
+    )
+    assert protected.status_code == 400  # authenticated (not 401), only the old password is wrong
+    second = await client.post(REFRESH_URL, json={"refresh_token": new_tokens["refresh_token"]})
+    assert second.status_code == 200
+
+
+async def test_concurrent_refresh_with_same_token_succeeds_only_once(client, db_session, active_user, auth_tokens):
+    payload = {"refresh_token": auth_tokens["refresh_token"]}
+
+    responses = await asyncio.gather(*(client.post(REFRESH_URL, json=payload) for _ in range(2)))
+
+    assert sorted(r.status_code for r in responses) == [200, 401]
+    stmt = select(RefreshToken).where(RefreshToken.user_id == active_user.id)
+    assert len((await db_session.execute(stmt)).scalars().all()) == 1
 
 
 @pytest.mark.usefixtures("auth_tokens")

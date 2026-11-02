@@ -4,6 +4,7 @@ Each test uses its own throwaway database, the per-worker test database is not t
 """
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 from src.core.config import settings, to_sync_url
 from src.tests.db import alembic, create_database, drop_database, with_database
@@ -11,7 +12,7 @@ from src.tests.db import alembic, create_database, drop_database, with_database
 
 @pytest.fixture()
 def empty_database(worker_id: str):
-    base_name = settings.TEST_DATABASE_URL.rsplit("/", 1)[-1]
+    base_name = make_url(settings.TEST_DATABASE_URL).database
     url = with_database(settings.TEST_DATABASE_URL, f"{base_name}_migrations_{worker_id}")
     create_database(url)
     yield url
@@ -36,10 +37,28 @@ def test_upgrade_downgrade_upgrade_cycle(empty_database):
 
     alembic(empty_database, ("downgrade", "base"))
     assert query(empty_database, USER_TABLES) == ["alembic_version"]
-    assert query(empty_database, ENUM_TYPES) == []  # enum types must not outlive their tables
+    assert query(empty_database, ENUM_TYPES) == []
 
-    alembic(empty_database, ("upgrade", "head"))  # fails if downgrade left anything behind
+    alembic(empty_database, ("upgrade", "head"))
     assert query(empty_database, "select count(*) from user_groups") == [3]
+
+
+def test_downgrade_refuses_to_remove_groups_that_users_belong_to(empty_database):
+    alembic(empty_database, ("upgrade", "head"))
+    engine = create_engine(to_sync_url(empty_database))
+    with engine.begin() as conn:
+        conn.execute(text(
+            "insert into users (email, hashed_password, is_active, group_id) "
+            "values ('kept@example.com', 'x', true, (select id from user_groups where name = 'USER'))"
+        ))
+    engine.dispose()
+
+    with pytest.raises(RuntimeError, match="users"):
+        alembic(empty_database, ("downgrade", "base"))
+
+    assert query(empty_database, "select version_num from alembic_version") == ["5b1c7e9d2a40"]
+    assert query(empty_database, "select count(*) from user_groups") == [3]
+    assert query(empty_database, "select email from users") == ["kept@example.com"]
 
 
 def test_models_match_migrations(empty_database):

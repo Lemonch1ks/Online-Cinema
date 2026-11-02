@@ -1,8 +1,15 @@
 import re
+import warnings
+from datetime import date
+from io import BytesIO
 
 import email_validator
+from PIL import Image
 
 from src.core.config import settings
+
+NAME_PATTERN = re.compile(r"[^\W\d_]+(?:[ '-][^\W\d_]+)*")
+MIN_BIRTH_YEAR = 1900
 
 
 def validate_password(password):
@@ -30,3 +37,38 @@ def validate_email(user_email: str) -> str:
         raise ValueError(str(error))
     else:
         return email
+
+
+def validate_name(name: str) -> str:
+    name = name.strip()
+    if not NAME_PATTERN.fullmatch(name):
+        raise ValueError("Name may contain only letters, single spaces, hyphens and apostrophes.")
+    return name
+
+
+def validate_birth_date(birth_date: date) -> date:
+    if birth_date.year < MIN_BIRTH_YEAR:
+        raise ValueError(f"Birth year must be {MIN_BIRTH_YEAR} or later.")
+    if birth_date > date.today():
+        raise ValueError("Birth date cannot be in the future.")
+    return birth_date
+
+
+def validate_avatar(data: bytes) -> str:
+    """Check size and the real image format (from the content, not from the client's filename or Content-Type).
+
+    Returns the Pillow format name, e.g. "PNG".
+    """
+    if len(data) > settings.AVATAR_MAX_SIZE:
+        raise ValueError(f"Avatar must not be larger than {settings.AVATAR_MAX_SIZE // 1024} KB.")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data)) as image:
+                image_format = image.format
+                image.verify()
+    except Exception as error:
+        raise ValueError("Avatar is not a valid image.") from error
+    if image_format not in settings.AVATAR_FORMATS:
+        raise ValueError(f"Unsupported avatar format {image_format}, use one of: {', '.join(settings.AVATAR_FORMATS)}.")
+    return image_format

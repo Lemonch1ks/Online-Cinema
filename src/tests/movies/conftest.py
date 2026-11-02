@@ -4,8 +4,6 @@ import pytest
 
 from src.movies.models import Certification, Director, Genre, Movie, Star
 
-# Small, hand-made catalog: every value is chosen so filters and sorting have one clear answer.
-# id order: Matrix(1), Forrest Gump(2), Cast Away(3), Inception(4)
 MOVIES = [
     {
         "name": "The Matrix", "year": 1999, "imdb": 8.7, "meta_score": 73, "gross": 171.5,

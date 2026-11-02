@@ -62,7 +62,7 @@ class Genre(Base):
     __tablename__ = 'genres'
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    movies: Mapped[list["Movie"]] = relationship(secondary=movie_genres_table, back_populates="genres")
+    movies: Mapped[list["Movie"]] = relationship(secondary=movie_genres_table, back_populates="genres", order_by="Movie.id")
 
 class Star(Base):
     __tablename__ = 'stars'

@@ -1,3 +1,6 @@
+from urllib.parse import urlsplit
+import asyncio
+
 import pytest
 from sqlalchemy import select
 
@@ -52,6 +55,16 @@ async def test_activate_with_valid_token_activates_user(client, db_session, emai
     assert inactive_user.is_active is True
     assert await get_activation_token(db_session, inactive_user.id) is None
     assert [email for email, _ in email_sender.activation_complete_emails] == [TEST_EMAIL]
+
+
+async def test_login_link_in_activation_complete_email_opens(client, db_session, email_sender, inactive_user):
+    token = await create_activation_token(db_session, inactive_user)
+    await client.get(f"{ACTIVATION_URL}{token.token}")
+    [(_, login_link)] = email_sender.activation_complete_emails
+
+    response = await client.get(urlsplit(login_link).path)
+
+    assert response.status_code == 200
 
 
 async def test_activate_with_unknown_token_returns_400(client, inactive_user):
@@ -130,8 +143,7 @@ async def test_resend_response_is_same_for_all_emails(client, db_session, email_
     ]
 
     assert all(r.status_code == 200 for r in responses)
-    assert len({r.json()["detail"] for r in responses}) == 1  # no user enumeration
-    # only the inactive account gets a new link
+    assert len({r.json()["detail"] for r in responses}) == 1
     assert [email for email, _ in email_sender.activation_emails] == ["inactive@example.com"]
 
 
@@ -178,8 +190,7 @@ async def test_reset_request_response_is_same_for_all_emails(client, db_session,
     ]
 
     assert all(r.status_code == 200 for r in responses)
-    assert len({r.json()["detail"] for r in responses}) == 1  # no user enumeration
-    # only the active account gets a reset link
+    assert len({r.json()["detail"] for r in responses}) == 1
     assert [email for email, _ in email_sender.password_reset_emails] == [TEST_EMAIL]
 
 
@@ -269,7 +280,7 @@ async def test_complete_reset_with_weak_password_returns_422(client, db_session,
     response = await client.post(PASSWORD_RESET_COMPLETE_URL, json={"token": token.token, "new_password": password})
 
     assert response.status_code == 422
-    assert await get_password_reset_token(db_session, active_user.id) is not None  # token not consumed
+    assert await get_password_reset_token(db_session, active_user.id) is not None
 
 
 # --- end-to-end ---
@@ -286,3 +297,20 @@ async def test_forgot_password_full_flow(client, email_sender, active_user):
     assert check.status_code == 200
     assert complete.status_code == 200
     assert login.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("url", "user_is_active", "get_token"),
+    [
+        (ACTIVATION_RESEND_URL, False, get_activation_token),
+        (PASSWORD_RESET_REQUEST_URL, True, get_password_reset_token),
+    ],
+    ids=["resend-activation", "password-reset-request"],
+)
+async def test_concurrent_token_requests_both_succeed_with_one_token(client, db_session, url, user_is_active, get_token):
+    user = await create_user(db_session, is_active=user_is_active)
+
+    responses = await asyncio.gather(*(client.post(url, json={"email": TEST_EMAIL}) for _ in range(2)))
+
+    assert [r.status_code for r in responses] == [200, 200]
+    assert await get_token(db_session, user.id) is not None

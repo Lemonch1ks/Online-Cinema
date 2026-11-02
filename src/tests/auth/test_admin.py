@@ -81,7 +81,6 @@ async def test_admin_endpoints_without_auth_return_401(client, target_user):
 
 
 async def test_role_is_read_from_db_not_from_token(client, db_session, target_user, admin_headers):
-    # the access token holds only the email, so a promotion applies to an already issued token
     user_headers = bearer((await login(client, TARGET_EMAIL))["access_token"])
     await client.patch(group_url(target_user.id), json={"new_group_rank": UserGroupEnum.ADMIN}, headers=admin_headers)
 

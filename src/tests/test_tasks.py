@@ -1,5 +1,6 @@
 """Celery tasks: called directly, no Redis or worker needed."""
 import logging
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from celery.schedules import crontab
@@ -9,12 +10,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 import src.tasks
-from src.auth.models import ActivationToken
+from src.auth.models import ActivationToken, User, UserProfile
 from src.core.config import to_sync_url
-from src.tasks import app, delete_expired_activation_tokens
+from src.storage.s3 import StorageError
+from src.tasks import app, delete_expired_activation_tokens, delete_orphan_avatars
 from src.tests.utils import create_activation_token, create_user
 
 TASK_NAME = "src.tasks.delete_expired_activation_tokens"
+ORPHANS_TASK_NAME = "src.tasks.delete_orphan_avatars"
 
 
 @pytest.fixture(autouse=True)
@@ -55,7 +58,6 @@ async def test_nothing_to_delete_returns_zero(db_session):
 
 
 def test_task_runs_through_celery_machinery():
-    # apply() executes the task locally with Celery's request/result objects, still without a broker
     result = delete_expired_activation_tokens.apply()
 
     assert result.successful()
@@ -68,7 +70,6 @@ def test_db_error_fails_the_task(monkeypatch):
 
     monkeypatch.setattr(Session, "commit", failing_commit)
 
-    # the error is not swallowed: Celery sees it and marks the task as FAILURE
     result = delete_expired_activation_tokens.apply()
     assert result.failed()
     with pytest.raises(OperationalError):
@@ -84,3 +85,64 @@ def test_beat_runs_cleanup_daily_at_midnight_utc():
 
     assert schedule[TASK_NAME] == crontab(minute=0, hour=0)
     assert app.conf.enable_utc is True
+
+
+class ListingStorage:
+    """Storage fake for the cleanup task: objects with their upload time."""
+
+    def __init__(self, objects: dict[str, datetime], fail: bool = False) -> None:
+        self.objects = dict(objects)
+        self.fail = fail
+        self.deleted: list[str] = []
+
+    async def list_objects(self) -> list[tuple[str, datetime]]:
+        if self.fail:
+            raise StorageError("storage is down")
+        return list(self.objects.items())
+
+    async def delete(self, key: str) -> None:
+        self.deleted.append(key)
+        self.objects.pop(key)
+
+
+def test_cleanup_deletes_only_old_unreferenced_avatars(monkeypatch, caplog):
+    with src.tasks.SyncSessionLocal() as session:
+        user = User.create(email="owner@example.com", raw_password="StrongPass1!", group_id=1)
+        session.add(user)
+        session.flush()
+        session.add(UserProfile(user_id=user.id, avatar=f"{user.id}/kept.png"))
+        session.commit()
+        user_id = user.id
+    old = datetime.now(timezone.utc) - timedelta(days=2)
+    storage = ListingStorage({
+        f"{user_id}/kept.png": old,
+        f"{user_id}/orphan.png": old,
+        f"{user_id}/just-uploaded.png": datetime.now(timezone.utc),
+    })
+    monkeypatch.setattr(src.tasks, "get_storage", lambda: storage)
+
+    with caplog.at_level(logging.INFO):
+        deleted = delete_orphan_avatars()
+
+    assert deleted == 1
+    assert storage.deleted == [f"{user_id}/orphan.png"]
+    assert "Deleted 1 orphan avatars" in caplog.text
+
+
+def test_cleanup_with_empty_bucket_returns_zero(monkeypatch):
+    storage = ListingStorage({})
+    monkeypatch.setattr(src.tasks, "get_storage", lambda: storage)
+
+    assert delete_orphan_avatars() == 0
+
+
+def test_cleanup_fails_the_task_when_storage_is_down(monkeypatch):
+    monkeypatch.setattr(src.tasks, "get_storage", lambda: ListingStorage({}, fail=True))
+
+    assert delete_orphan_avatars.apply().failed()
+
+
+def test_beat_runs_orphan_cleanup_daily_after_token_cleanup():
+    schedule = {entry["task"]: entry["schedule"] for entry in app.conf.beat_schedule.values()}
+
+    assert schedule[ORPHANS_TASK_NAME] == crontab(minute=30, hour=0)

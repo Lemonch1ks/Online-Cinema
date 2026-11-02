@@ -1,6 +1,6 @@
 """Database errors on commit: endpoints must roll back and answer with an error instead of crashing."""
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import Delete, delete, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,7 +32,6 @@ def broken_commit(monkeypatch):
 
     def apply() -> None:
         async def failing_commit(self) -> None:
-            # OperationalError is a DatabaseError, which is a SQLAlchemyError: matches every except in the code
             raise OperationalError("COMMIT", {}, Exception("database is locked"))
 
         monkeypatch.setattr(AsyncSession, "commit", failing_commit)
@@ -81,7 +80,7 @@ async def test_resend_returns_500_on_db_error(client, email_sender, inactive_use
     response = await client.post(ACTIVATION_RESEND_URL, json={"email": TEST_EMAIL})
 
     assert response.status_code == 500
-    assert email_sender.activation_emails == []  # no link to a token that was never saved
+    assert email_sender.activation_emails == []
 
 
 async def test_reset_request_returns_500_on_db_error(client, email_sender, active_user, broken_commit):
@@ -103,7 +102,7 @@ async def test_reset_complete_returns_500_on_db_error(client, db_session, active
 
     assert response.status_code == 500
     monkeypatch.undo()
-    await login(client)  # old password still works
+    await login(client)
 
 
 async def test_change_password_returns_500_on_db_error(client, auth_headers, broken_commit, monkeypatch):
@@ -126,7 +125,23 @@ async def test_refresh_returns_400_on_db_error(client, db_session, auth_tokens, 
     response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
 
     assert response.status_code == 400
-    # the old refresh token was not deleted
+    stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])
+    assert (await db_session.execute(stmt)).scalar_one_or_none() is not None
+
+
+async def test_refresh_returns_400_when_token_delete_fails(client, db_session, auth_tokens, monkeypatch):
+    original_execute = AsyncSession.execute
+
+    async def failing_delete(self, statement, *args, **kwargs):
+        if isinstance(statement, Delete):
+            raise OperationalError("DELETE", {}, Exception("database is locked"))
+        return await original_execute(self, statement, *args, **kwargs)
+
+    monkeypatch.setattr(AsyncSession, "execute", failing_delete)
+
+    response = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})
+
+    assert response.status_code == 400
     stmt = select(RefreshToken).where(RefreshToken.token == auth_tokens["refresh_token"])
     assert (await db_session.execute(stmt)).scalar_one_or_none() is not None
 

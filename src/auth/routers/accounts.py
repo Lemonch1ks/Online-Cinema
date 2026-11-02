@@ -1,8 +1,9 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -24,6 +25,22 @@ from src.notifications.emails import EmailSender, BaseEmailError
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def save_new_token(
+        db: AsyncSession,
+        model: type[ActivationToken] | type[PasswordResetToken],
+        user_id: int,
+        token: str,
+        lifetime: timedelta,
+) -> None:
+    values = {"token": token, "expires_at": datetime.now(timezone.utc) + lifetime}
+    stmt = (
+        pg_insert(model)
+        .values(user_id=user_id, **values)
+        .on_conflict_do_update(index_elements=[model.user_id], set_=values)
+    )
+    await db.execute(stmt)
 
 
 @router.get(
@@ -97,13 +114,7 @@ async def resend_activation_link(
 ) -> dict[str, str]:
     response = {"detail": "If the account exists and is not activated, a new activation link has been sent."}
 
-    stmt = (
-        select(User)
-        .where(User.email == data.email)
-        .options(selectinload(User.activation_token))
-    )
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.email == data.email))).scalar_one_or_none()
 
     if user is None or user.is_active:
         return response
@@ -111,13 +122,7 @@ async def resend_activation_link(
     new_token = generate_token(settings.ACTIVATION_TOKEN_NBYTES)
 
     try:
-        if user.activation_token:
-            user.activation_token.token = new_token
-            user.activation_token.expires_at = (
-                datetime.now(timezone.utc) + settings.ACTIVATION_TOKEN_LIFETIME
-            )
-        else:
-            db.add(ActivationToken(user_id=user.id, token=new_token))
+        await save_new_token(db, ActivationToken, user.id, new_token, settings.ACTIVATION_TOKEN_LIFETIME)
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()
@@ -143,12 +148,7 @@ async def reset_password_request(
 ) -> dict[str, str]:
     response = {"detail": "If the account exists a new password reset link has been sent."}
 
-    stmt = (
-        select(User)
-        .where(User.email == email.email)
-        .options(selectinload(User.password_reset_token))
-    )
-    user = (await db.execute(stmt)).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.email == email.email))).scalar_one_or_none()
 
     if not user or not user.is_active:
         return response
@@ -156,13 +156,7 @@ async def reset_password_request(
     new_reset_token = generate_token(settings.PASSWORD_RESET_TOKEN_NBYTES)
 
     try:
-        if user.password_reset_token:
-            user.password_reset_token.token = new_reset_token
-            user.password_reset_token.expires_at = (
-                datetime.now(timezone.utc) + settings.PASSWORD_RESET_TOKEN_LIFETIME
-            )
-        else:
-            db.add(PasswordResetToken(user_id=user.id, token=new_reset_token))
+        await save_new_token(db, PasswordResetToken, user.id, new_reset_token, settings.PASSWORD_RESET_TOKEN_LIFETIME)
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()

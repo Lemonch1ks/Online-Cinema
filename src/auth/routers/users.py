@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import select, delete
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_active_user
@@ -64,6 +64,9 @@ async def register_user(
 
         await db.commit()
         await db.refresh(new_user)
+    except IntegrityError as e:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="User already exists") from e
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(

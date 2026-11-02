@@ -5,7 +5,6 @@ from sqlalchemy.engine import make_url
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-# async driver -> sync driver, for Alembic and other sync code
 SYNC_DRIVERS = {"postgresql+asyncpg": "postgresql+psycopg"}
 
 
@@ -21,10 +20,10 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = "Movie API"
     APP_VERSION: str = "1.0.0"
     APP_BASE_URL: str = "http://127.0.0.1:8000"
+    FRONTEND_URL: str | None = None
     API_VERSION_PREFIX: str = "/api/v1"
 
     # --- Database ---
-    # Required, async driver: postgresql+asyncpg://user:password@host:5432/dbname
     DATABASE_URL: str
     DB_ECHO: bool = False
 
@@ -35,12 +34,10 @@ class Settings(BaseSettings):
     # --- Auth: JWT and tokens ---
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    SECURITY_TOKEN_URL: str = API_VERSION_PREFIX + "/security"
     ACCESS_TOKEN_LIFETIME: timedelta = timedelta(hours=1)
     REFRESH_TOKEN_LIFETIME: timedelta = timedelta(hours=48)
     PASSWORD_RESET_TOKEN_LIFETIME: timedelta = timedelta(hours=24)
     ACTIVATION_TOKEN_LIFETIME: timedelta = timedelta(hours=24)
-    # Number of random bytes behind each token (the token string itself is longer: URL-safe base64).
     REFRESH_TOKEN_NBYTES: int = 48
     PASSWORD_RESET_TOKEN_NBYTES: int = 32
     ACTIVATION_TOKEN_NBYTES: int = 32
@@ -48,10 +45,6 @@ class Settings(BaseSettings):
     # --- Auth: password policy ---
     PASSWORD_MIN_LENGTH: int = 8
     PASSWORD_SPECIAL_CHARS: str = "@$!%*?&#"
-
-    # --- Links sent in emails ---
-    ACTIVATION_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/activate"
-    PASSWORD_RESET_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/password_reset"
 
     # --- Email ---
     EMAIL_HOSTNAME: str
@@ -69,13 +62,23 @@ class Settings(BaseSettings):
     PASSWORD_RESET_REQUEST_SUBJECT: str = "Password Reset Request"
     PASSWORD_RESET_COMPLETE_SUBJECT: str = "Your Password Has Been Successfully Reset"
 
+    # --- File storage (S3 API: MinIO in docker-compose) ---
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_PUBLIC_URL: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET: str = "avatars"
+    ORPHAN_AVATAR_MIN_AGE: timedelta = timedelta(hours=1)
+
+    # --- Profiles: avatar ---
+    AVATAR_MAX_SIZE: int = 1024 * 1024
+    AVATAR_FORMATS: tuple[str, ...] = ("JPEG", "PNG")
+
     # --- Movies: pagination ---
     PAGINATION_DEFAULT_PER_PAGE: int = 10
     PAGINATION_MAX_PER_PAGE: int = 20
 
     # --- Tests ---
-    # Base URL of the test database. Each pytest(-xdist) worker gets its own copy: <name>_<worker_id>.
-    # The default matches the Postgres service from docker-compose.yml.
     TEST_DATABASE_URL: str = "postgresql+asyncpg://cinema:cinema@localhost:5432/cinema_test"
     TEST_DB_ECHO: bool = False
 
@@ -87,6 +90,18 @@ class Settings(BaseSettings):
 
 
     @property
+    def SECURITY_TOKEN_URL(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/security"
+
+    @property
+    def ACTIVATION_LINK_BASE(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/accounts/activate"
+
+    @property
+    def PASSWORD_RESET_LINK_BASE(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/accounts/password_reset"
+
+    @property
     def ACTIVATION_LINK_ENDPOINT(self) -> str:
         return f"{self.APP_BASE_URL}{self.ACTIVATION_LINK_BASE}"
 
@@ -96,7 +111,9 @@ class Settings(BaseSettings):
 
     @property
     def LOGIN_LINK_ENDPOINT(self) -> str:
-        return f"{self.APP_BASE_URL}{self.SECURITY_TOKEN_URL}/token"
+        if self.FRONTEND_URL:
+            return f"{self.FRONTEND_URL.rstrip('/')}/login"
+        return f"{self.APP_BASE_URL}/docs"
 
 
 settings = Settings() # type: ignore
