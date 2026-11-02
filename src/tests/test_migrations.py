@@ -36,9 +36,9 @@ def test_upgrade_downgrade_upgrade_cycle(empty_database):
 
     alembic(empty_database, ("downgrade", "base"))
     assert query(empty_database, USER_TABLES) == ["alembic_version"]
-    assert query(empty_database, ENUM_TYPES) == []  # enum types must not outlive their tables
+    assert query(empty_database, ENUM_TYPES) == []
 
-    alembic(empty_database, ("upgrade", "head"))  # fails if downgrade left anything behind
+    alembic(empty_database, ("upgrade", "head"))
     assert query(empty_database, "select count(*) from user_groups") == [3]
 
 

@@ -46,7 +46,6 @@ async def create_user(
 
 
 async def get_group_id(db: AsyncSession, group: UserGroupEnum) -> int:
-    # group ids come from insert order, not from enum values (ADMIN has id 3, rank 10)
     return (await db.execute(select(UserGroup.id).where(UserGroup.name == group))).scalar_one()
 
 

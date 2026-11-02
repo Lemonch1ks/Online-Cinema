@@ -111,7 +111,7 @@ async def test_email_is_rendered_and_sent(method, subject):
     assert message["To"] == RECIPIENT
     assert message["Subject"] == subject
     assert message.get_payload()[0].get_content_type() == "text/html"
-    assert LINK in html  # the template variable name matches what the method passes
+    assert LINK in html
     assert RECIPIENT in html
 
 
@@ -153,4 +153,4 @@ def test_get_email_sender_is_built_from_settings_and_cached():
     assert isinstance(sender, EmailSender)
     assert sender._hostname == settings.EMAIL_HOSTNAME
     assert sender._port == settings.EMAIL_PORT
-    assert get_email_sender() is sender  # lru_cache: one instance per process
+    assert get_email_sender() is sender

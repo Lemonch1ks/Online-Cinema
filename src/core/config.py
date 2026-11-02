@@ -5,7 +5,6 @@ from sqlalchemy.engine import make_url
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-# async driver -> sync driver, for Alembic and other sync code
 SYNC_DRIVERS = {"postgresql+asyncpg": "postgresql+psycopg"}
 
 
@@ -24,7 +23,6 @@ class Settings(BaseSettings):
     API_VERSION_PREFIX: str = "/api/v1"
 
     # --- Database ---
-    # Required, async driver: postgresql+asyncpg://user:password@host:5432/dbname
     DATABASE_URL: str
     DB_ECHO: bool = False
 
@@ -40,7 +38,6 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_LIFETIME: timedelta = timedelta(hours=48)
     PASSWORD_RESET_TOKEN_LIFETIME: timedelta = timedelta(hours=24)
     ACTIVATION_TOKEN_LIFETIME: timedelta = timedelta(hours=24)
-    # Number of random bytes behind each token (the token string itself is longer: URL-safe base64).
     REFRESH_TOKEN_NBYTES: int = 48
     PASSWORD_RESET_TOKEN_NBYTES: int = 32
     ACTIVATION_TOKEN_NBYTES: int = 32
@@ -74,8 +71,6 @@ class Settings(BaseSettings):
     PAGINATION_MAX_PER_PAGE: int = 20
 
     # --- Tests ---
-    # Base URL of the test database. Each pytest(-xdist) worker gets its own copy: <name>_<worker_id>.
-    # The default matches the Postgres service from docker-compose.yml.
     TEST_DATABASE_URL: str = "postgresql+asyncpg://cinema:cinema@localhost:5432/cinema_test"
     TEST_DB_ECHO: bool = False
 

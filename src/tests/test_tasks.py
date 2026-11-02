@@ -55,7 +55,6 @@ async def test_nothing_to_delete_returns_zero(db_session):
 
 
 def test_task_runs_through_celery_machinery():
-    # apply() executes the task locally with Celery's request/result objects, still without a broker
     result = delete_expired_activation_tokens.apply()
 
     assert result.successful()
@@ -68,7 +67,6 @@ def test_db_error_fails_the_task(monkeypatch):
 
     monkeypatch.setattr(Session, "commit", failing_commit)
 
-    # the error is not swallowed: Celery sees it and marks the task as FAILURE
     result = delete_expired_activation_tokens.apply()
     assert result.failed()
     with pytest.raises(OperationalError):

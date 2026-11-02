@@ -9,7 +9,6 @@ from src.auth.security import create_access_token
 from src.core.config import settings
 from src.tests.utils import CHANGE_PASSWORD_URL, REFRESH_URL, TEST_EMAIL, TEST_PASSWORD, bearer
 
-# change_password is a simple endpoint behind get_current_active_user
 PAYLOAD = {"old_password": TEST_PASSWORD, "new_password": "NewStrongPass2!"}
 
 
@@ -23,7 +22,7 @@ async def call_protected(client, token: str):
         "not-a-jwt",
         jwt.encode({"sub": TEST_EMAIL}, "wrong-secret-key-wrong-secret-key", algorithm=settings.ALGORITHM),
         create_access_token({"sub": TEST_EMAIL}, expires_delta=timedelta(seconds=-1)),
-        create_access_token({"user": TEST_EMAIL}),  # no "sub" claim
+        create_access_token({"user": TEST_EMAIL}),
     ],
     ids=["garbage", "wrong-signature", "expired", "no-sub"],
 )

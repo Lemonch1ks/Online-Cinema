@@ -15,7 +15,6 @@ from src.notifications.dependencies import get_email_sender
 from src.tests.db import alembic, create_database, drop_database, with_database
 from src.tests.utils import LOGIN_URL, TEST_EMAIL, TEST_PASSWORD, create_user
 
-# alembic_version is not in Base.metadata, so it survives the cleanup
 TABLES = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
 
 
@@ -35,8 +34,6 @@ def database_url(worker_id: str) -> Generator[str, None, None]:
 
 @pytest.fixture(scope="session")
 def engine(database_url: str) -> AsyncEngine:
-    # NullPool: pytest-asyncio gives every test its own event loop, and an asyncpg connection
-    # is bound to the loop it was opened in. Without a pool every session opens a fresh connection.
     return create_async_engine(database_url, echo=settings.TEST_DB_ECHO, poolclass=NullPool)
 
 

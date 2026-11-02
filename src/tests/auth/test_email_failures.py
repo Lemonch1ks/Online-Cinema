@@ -39,7 +39,6 @@ class FailingEmailSender:
 
 @pytest.fixture()
 def email_sender() -> FailingEmailSender:
-    # overrides the conftest fixture, so the `client` fixture injects this sender
     return FailingEmailSender()
 
 

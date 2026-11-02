@@ -15,7 +15,7 @@ async def test_register_creates_inactive_user(client, db_session, email_sender):
 
     assert response.status_code == 201
     body = response.json()
-    assert body["email"] == "new.user@example.com"  # email is lowercased
+    assert body["email"] == "new.user@example.com"
     assert "password" not in body
     assert "hashed_password" not in body
 
@@ -47,7 +47,7 @@ async def test_register_duplicate_email_returns_409(client, db_session, email_se
     assert response.status_code == 409
     users = (await db_session.execute(select(User))).scalars().all()
     assert len(users) == 1
-    assert len(email_sender.activation_emails) == 1  # no second email
+    assert len(email_sender.activation_emails) == 1
 
 
 @pytest.mark.parametrize(

@@ -16,11 +16,10 @@ from src.tests.utils import create_activation_token
     ("async_url", "sync_url"),
     [
         ("postgresql+asyncpg://user:pass@db:5432/cinema", "postgresql+psycopg://user:pass@db:5432/cinema"),
-        ("mysql+pymysql://user:pass@db/cinema", "mysql+pymysql://user:pass@db/cinema"),  # unknown driver kept as is
+        ("mysql+pymysql://user:pass@db/cinema", "mysql+pymysql://user:pass@db/cinema"),
     ],
 )
 def test_sync_database_url(async_url, sync_url):
-    # Alembic runs synchronously, so it needs a sync driver; the password must survive the conversion
     assert settings.model_copy(update={"DATABASE_URL": async_url}).SYNC_DATABASE_URL == sync_url
 
 
@@ -58,7 +57,6 @@ async def test_get_db_yields_session_and_closes_it():
 
 
 async def test_deleting_user_cascades_to_tokens(db_session, active_user, auth_tokens):
-    # ON DELETE CASCADE is done by Postgres itself: a Core DELETE bypasses the ORM relationship cascades
     await create_activation_token(db_session, active_user)
 
     await db_session.execute(delete(User).where(User.id == active_user.id))

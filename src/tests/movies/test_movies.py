@@ -69,7 +69,7 @@ async def test_movies_page_out_of_range_returns_404(client, catalog):
         {"sort_by": "price"},
         {"order_type": "random"},
         {"search_param": ""},
-        {"unknown_param": "x"},  # extra="forbid"
+        {"unknown_param": "x"},
     ],
 )
 async def test_movies_invalid_query_returns_422(client, catalog, params):
@@ -114,12 +114,12 @@ async def test_movies_filter_without_matches_returns_404(client, catalog):
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
-        ({"sort_by": "year"}, ["Inception", "Cast Away", "The Matrix", "Forrest Gump"]),  # desc by default
+        ({"sort_by": "year"}, ["Inception", "Cast Away", "The Matrix", "Forrest Gump"]),
         ({"sort_by": "year", "order_type": "asc"}, ["Forrest Gump", "The Matrix", "Cast Away", "Inception"]),
         ({"sort_by": "imdb", "order_type": "desc"}, ["Forrest Gump", "The Matrix", "Inception", "Cast Away"]),
         ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception"]),
         ({"sort_by": "gross", "order_type": "desc"}, ["Forrest Gump", "Inception", "Cast Away", "The Matrix"]),
-        ({"order_type": "asc"}, ["The Matrix", "Forrest Gump", "Cast Away", "Inception"]),  # no sort_by: by id
+        ({"order_type": "asc"}, ["The Matrix", "Forrest Gump", "Cast Away", "Inception"]),
     ],
 )
 async def test_movies_sorting(client, catalog, params, expected):
@@ -140,9 +140,6 @@ async def movie_without_scores(db_session, catalog) -> Movie:
     return movie
 
 
-# PostgreSQL puts NULL *first* in DESC and *last* in ASC (it treats NULL as larger than any value).
-# So "highest meta_score first" currently starts with a movie that has no score at all.
-# If that is not wanted, the fix is .nulls_last() in MovieSort.sort, then update these expectations.
 @pytest.mark.parametrize(
     ("params", "expected"),
     [
@@ -160,7 +157,7 @@ async def test_movies_sorting_with_null_values(client, movie_without_scores, par
 async def test_movies_range_filter_excludes_null_values(client, movie_without_scores):
     response = await client.get(MOVIES_URL, params={"meta_score_to": 100})
 
-    assert "Unknown Indie" not in names(response)  # NULL <= 100 is not true in SQL
+    assert "Unknown Indie" not in names(response)
     assert response.json()["total_items"] == 4
 
 
@@ -175,12 +172,12 @@ async def test_movies_sorting_applies_before_pagination(client, catalog):
 @pytest.mark.parametrize(
     ("search", "expected"),
     [
-        ("matrix", ["The Matrix"]),  # name, case-insensitive
-        ("island", ["Cast Away"]),  # description
-        ("keanu", ["The Matrix"]),  # star
-        ("zemeckis", ["Forrest Gump", "Cast Away"]),  # director
-        ("  inception  ", ["Inception"]),  # whitespace is stripped
-        ("%", ["Inception"]),  # LIKE wildcards are escaped, "%" is a normal character
+        ("matrix", ["The Matrix"]),
+        ("island", ["Cast Away"]),
+        ("keanu", ["The Matrix"]),
+        ("zemeckis", ["Forrest Gump", "Cast Away"]),
+        ("  inception  ", ["Inception"]),
+        ("%", ["Inception"]),
     ],
 )
 async def test_movies_search(client, catalog, search, expected):

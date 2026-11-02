@@ -13,8 +13,6 @@ def with_database(url: str, database: str) -> str:
 
 
 def _admin_engine(url: str):
-    # CREATE / DROP DATABASE cannot run inside a transaction, hence AUTOCOMMIT.
-    # Connect to the maintenance db "postgres", you cannot drop the db you are connected to.
     return create_engine(to_sync_url(with_database(url, "postgres")), isolation_level="AUTOCOMMIT")
 
 
@@ -23,7 +21,6 @@ def create_database(url: str) -> None:
     name = make_url(url).database
     engine = _admin_engine(url)
     with engine.connect() as conn:
-        # FORCE closes leftover connections (PostgreSQL 13+)
         conn.execute(text(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)'))
         conn.execute(text(f'CREATE DATABASE "{name}"'))
     engine.dispose()
@@ -46,7 +43,7 @@ def alembic(url: str, *commands: tuple[str, ...]) -> None:
     config = Config(toml_file=str(BASE_DIR / "pyproject.toml"))
     engine = create_engine(to_sync_url(url))
     with engine.begin() as connection:
-        config.attributes["connection"] = connection  # picked up by alembic/env.py
+        config.attributes["connection"] = connection
         for name, *args in commands:
             getattr(command, name)(config, *args)
     engine.dispose()
