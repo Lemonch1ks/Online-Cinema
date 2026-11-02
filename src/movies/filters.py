@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from typing import Self
+
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import Select, desc, asc
 
 from enum import Enum
@@ -21,8 +23,8 @@ class BasePagination(BaseModel):
 
 
 class MovieFilter(BaseModel):
-    imdb_from: float | None = Field(None, ge=0, description="Filters from IMDB rating")
-    imdb_to: float | None = Field(None, ge=0, description="Filters to IMDB rating")
+    imdb_from: float | None = Field(None, ge=0, le=10, description="Filters from IMDB rating")
+    imdb_to: float | None = Field(None, ge=0, le=10, description="Filters to IMDB rating")
     meta_score_from: float | None = Field(None, ge=0, description="Filters from meta rating")
     meta_score_to: float | None = Field(None, ge=0, description="Filters to meta rating")
     gross_from: float | None = Field(None, ge=0, description="Filters from gross")
@@ -30,6 +32,13 @@ class MovieFilter(BaseModel):
     year_from: int | None = Field(None, ge=0, description="Filters from year")
     year_to: int | None = Field(None, ge=0, description="Filters to year")
 
+    @model_validator(mode="after")
+    def check_ranges(self) -> Self:
+        for name in ("imdb", "meta_score", "gross", "year"):
+            low, high = getattr(self, f"{name}_from"), getattr(self, f"{name}_to")
+            if low is not None and high is not None and low > high:
+                raise ValueError(f"{name}_from must not be greater than {name}_to")
+        return self
 
     def filter(self, stmt: Select) -> Select:
         if self.imdb_from is not None:

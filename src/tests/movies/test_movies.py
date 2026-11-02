@@ -70,6 +70,11 @@ async def test_movies_page_out_of_range_returns_404(client, catalog):
         {"order_type": "random"},
         {"search_param": ""},
         {"unknown_param": "x"},
+        {"imdb_from": 8, "imdb_to": 5},
+        {"meta_score_from": 80, "meta_score_to": 70},
+        {"gross_from": 300, "gross_to": 100},
+        {"year_from": 2010, "year_to": 2000},
+        {"imdb_to": 11},
     ],
 )
 async def test_movies_invalid_query_returns_422(client, catalog, params):
@@ -101,6 +106,12 @@ async def test_movies_filters(client, catalog, params, expected):
     assert response.status_code == 200
     assert set(names(response)) == expected
     assert response.json()["total_items"] == len(expected)
+
+
+async def test_movies_filter_with_equal_bounds(client, catalog):
+    response = await client.get(MOVIES_URL, params={"imdb_from": 8.7, "imdb_to": 8.7})
+
+    assert names(response) == ["The Matrix"]
 
 
 async def test_movies_filter_without_matches_returns_404(client, catalog):
