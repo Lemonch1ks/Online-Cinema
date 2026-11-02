@@ -25,6 +25,8 @@ services:
 
   redis:
     image: redis:8-alpine
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -54,6 +56,26 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  celery_worker:
+    image: main_app
+    <<: *app-env
+    command: celery -A src.tasks worker --loglevel=info --concurrency=2
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+  celery_beat:
+    image: main_app
+    <<: *app-env
+    command: celery -A src.tasks beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
 
 
 volumes:
