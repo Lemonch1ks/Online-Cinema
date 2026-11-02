@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     # --- Auth: JWT and tokens ---
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    SECURITY_TOKEN_URL: str = API_VERSION_PREFIX + "/security"
     ACCESS_TOKEN_LIFETIME: timedelta = timedelta(hours=1)
     REFRESH_TOKEN_LIFETIME: timedelta = timedelta(hours=48)
     PASSWORD_RESET_TOKEN_LIFETIME: timedelta = timedelta(hours=24)
@@ -45,10 +44,6 @@ class Settings(BaseSettings):
     # --- Auth: password policy ---
     PASSWORD_MIN_LENGTH: int = 8
     PASSWORD_SPECIAL_CHARS: str = "@$!%*?&#"
-
-    # --- Links sent in emails ---
-    ACTIVATION_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/activate"
-    PASSWORD_RESET_LINK_BASE: str = API_VERSION_PREFIX + "/accounts/password_reset"
 
     # --- Email ---
     EMAIL_HOSTNAME: str
@@ -91,6 +86,18 @@ class Settings(BaseSettings):
     def SYNC_DATABASE_URL(self) -> str:
         return to_sync_url(self.DATABASE_URL)
 
+
+    @property
+    def SECURITY_TOKEN_URL(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/security"
+
+    @property
+    def ACTIVATION_LINK_BASE(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/accounts/activate"
+
+    @property
+    def PASSWORD_RESET_LINK_BASE(self) -> str:
+        return f"{self.API_VERSION_PREFIX}/accounts/password_reset"
 
     @property
     def ACTIVATION_LINK_ENDPOINT(self) -> str:
