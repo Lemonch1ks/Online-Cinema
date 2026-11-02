@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from src.auth.models import RefreshToken, User
-from src.auth.security import create_refresh_token
+from src.auth.security import create_refresh_token, decode_access_token
 from src.tests.utils import CHANGE_PASSWORD_URL, LOGIN_URL, REFRESH_URL, TEST_EMAIL, TEST_PASSWORD, bearer, create_user, LOGOUT_URL
 
 LOGIN_PAYLOAD = {"username": TEST_EMAIL, "password": TEST_PASSWORD}
@@ -18,7 +18,8 @@ async def test_login_returns_tokens_and_stores_refresh_token(client, db_session,
 
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert decode_access_token(data["access_token"])["sub"] == TEST_EMAIL
     assert "refresh_token" in data
 
     stmt = select(RefreshToken).where(RefreshToken.user_id == active_user.id)

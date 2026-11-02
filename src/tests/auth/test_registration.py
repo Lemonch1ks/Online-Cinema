@@ -1,6 +1,7 @@
-import pytest
 import asyncio
+from datetime import datetime, timedelta, timezone
 
+import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -37,7 +38,9 @@ async def test_register_creates_inactive_user(client, db_session, email_sender):
     assert len(email_sender.activation_emails) == 1
     recipient, link = email_sender.activation_emails[0]
     assert recipient == "new.user@example.com"
-    assert link.endswith(user.activation_token.token)
+    assert link == f"{settings.ACTIVATION_LINK_ENDPOINT}/{user.activation_token.token}"
+    expected_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+    assert abs(user.activation_token.expires_at - expected_expiry) < timedelta(minutes=1)
 
 
 async def test_register_duplicate_email_returns_409(client, db_session, email_sender):

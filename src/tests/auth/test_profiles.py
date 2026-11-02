@@ -89,6 +89,15 @@ async def test_create_profile_with_avatar(
     assert (await get_db_profile(db_session, active_user.id)).avatar == key
 
 
+async def test_avatar_format_comes_from_content_not_from_client_metadata(client, auth_headers, storage):
+    response = await create_profile(client, auth_headers, files=avatar_file(make_image("PNG"), "photo.jpg", "image/jpeg"))
+
+    assert response.status_code == 201
+    [(key, (_, stored_type))] = storage.files.items()
+    assert key.endswith(".png")
+    assert stored_type == "image/png"
+
+
 async def test_create_profile_with_only_some_fields(client, auth_headers):
     response = await create_profile(client, auth_headers, data={"first_name": "Bob"})
 
@@ -220,7 +229,7 @@ async def test_read_profile_when_none_returns_404(client, auth_headers):
 
 # --- PATCH /profiles/me ---
 
-async def test_update_profile_changes_only_sent_fields(client, auth_headers):
+async def test_update_profile_changes_only_sent_fields(client, db_session, active_user, auth_headers):
     await create_profile(client, auth_headers)
 
     response = await client.patch(PROFILE_URL, data={"info": "Now into documentaries.", "gender": "MAN"}, headers=auth_headers)
@@ -231,6 +240,8 @@ async def test_update_profile_changes_only_sent_fields(client, auth_headers):
     assert body["gender"] == "MAN"
     assert body["first_name"] == PROFILE_DATA["first_name"]
     assert body["date_of_birth"] == PROFILE_DATA["date_of_birth"]
+    saved = await get_db_profile(db_session, active_user.id)
+    assert (saved.info, saved.gender.value, saved.first_name) == ("Now into documentaries.", "MAN", PROFILE_DATA["first_name"])
 
 
 async def test_update_profile_replaces_avatar_and_deletes_old_file(client, db_session, active_user, auth_headers, storage):

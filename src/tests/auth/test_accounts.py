@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from src.auth.models import ActivationToken, PasswordResetToken, RefreshToken, User
+from src.core.config import settings
 from src.tests.utils import (
     ACTIVATION_RESEND_URL,
     ACTIVATION_URL,
@@ -109,7 +110,7 @@ async def test_resend_replaces_existing_activation_token(client, db_session, ema
     assert len(email_sender.activation_emails) == 1
     recipient, link = email_sender.activation_emails[0]
     assert recipient == TEST_EMAIL
-    assert link.endswith(new_token.token)
+    assert link == f"{settings.ACTIVATION_LINK_ENDPOINT}/{new_token.token}"
 
 
 async def test_resend_creates_token_when_user_has_none(client, db_session, email_sender, inactive_user):
@@ -166,11 +167,11 @@ async def test_reset_request_creates_token_and_sends_email(client, db_session, e
     assert len(email_sender.password_reset_emails) == 1
     recipient, link = email_sender.password_reset_emails[0]
     assert recipient == TEST_EMAIL
-    assert link.endswith(token.token)
+    assert link == f"{settings.PASSWORD_RESET_LINK_ENDPOINT}/{token.token}"
 
 
-async def test_reset_request_replaces_existing_token(client, db_session, email_sender, active_user):
-    old_token = await create_password_reset_token(db_session, active_user)
+async def test_reset_request_replaces_expired_token_with_a_working_one(client, db_session, email_sender, active_user):
+    old_token = await create_password_reset_token(db_session, active_user, expired=True)
     old_value = old_token.token
 
     response = await client.post(PASSWORD_RESET_REQUEST_URL, json={"email": TEST_EMAIL})
@@ -178,7 +179,10 @@ async def test_reset_request_replaces_existing_token(client, db_session, email_s
     assert response.status_code == 200
     new_token = await get_password_reset_token(db_session, active_user.id)
     assert new_token.token != old_value
-    assert email_sender.password_reset_emails[0][1].endswith(new_token.token)
+    [(_, link)] = email_sender.password_reset_emails
+    assert link == f"{settings.PASSWORD_RESET_LINK_ENDPOINT}/{new_token.token}"
+    complete = await client.post(PASSWORD_RESET_COMPLETE_URL, json={"token": new_token.token, "new_password": NEW_PASSWORD})
+    assert complete.status_code == 200
 
 
 async def test_reset_request_response_is_same_for_all_emails(client, db_session, email_sender, active_user):
