@@ -62,15 +62,18 @@ def test_derived_urls_follow_api_prefix_and_base_url():
 @pytest.mark.parametrize(
     ("frontend_url", "expected"),
     [
-        (None, "https://cinema.example/docs"),
         ("https://app.example", "https://app.example/login"),
         ("https://app.example/", "https://app.example/login"),
     ],
 )
-def test_login_link_points_to_a_page(frontend_url, expected):
-    custom = make_settings(APP_BASE_URL="https://cinema.example", FRONTEND_URL=frontend_url)
+def test_login_link_points_to_frontend_login_page(frontend_url, expected):
+    custom = make_settings(APP_BASE_URL="https://api.example", FRONTEND_URL=frontend_url)
 
     assert custom.LOGIN_LINK_ENDPOINT == expected
+
+
+def test_frontend_url_has_a_default():
+    assert make_settings().LOGIN_LINK_ENDPOINT == "http://localhost:3000/login"
 
 # --- database ---
 

@@ -1,4 +1,3 @@
-from urllib.parse import urlsplit
 import asyncio
 
 import pytest
@@ -58,14 +57,15 @@ async def test_activate_with_valid_token_activates_user(client, db_session, emai
     assert [email for email, _ in email_sender.activation_complete_emails] == [TEST_EMAIL]
 
 
-async def test_login_link_in_activation_complete_email_opens(client, db_session, email_sender, inactive_user):
+async def test_activation_complete_email_links_to_frontend_login(client, db_session, email_sender, inactive_user):
     token = await create_activation_token(db_session, inactive_user)
+
     await client.get(f"{ACTIVATION_URL}{token.token}")
-    [(_, login_link)] = email_sender.activation_complete_emails
 
-    response = await client.get(urlsplit(login_link).path)
-
-    assert response.status_code == 200
+    [(recipient, login_link)] = email_sender.activation_complete_emails
+    assert recipient == TEST_EMAIL
+    assert login_link == f"{settings.FRONTEND_URL}/login"
+    assert settings.SECURITY_TOKEN_URL not in login_link
 
 
 async def test_activate_with_unknown_token_returns_400(client, inactive_user):
