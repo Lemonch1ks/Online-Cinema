@@ -1,49 +1,65 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
 from httpx2 import ASGITransport, AsyncClient
-from sqlalchemy import insert
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import insert, text
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from src.auth.models import User, UserGroup, UserGroupEnum
 from src.core.config import settings
-from src.core.database import Base, enable_sqlite_foreign_keys, get_db
+from src.core.database import Base, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
+from src.tests.db import alembic, create_database, drop_database, with_database
 from src.tests.utils import LOGIN_URL, TEST_EMAIL, TEST_PASSWORD, create_user
 
-# StaticPool: in-memory SQLite lives per connection, so all sessions must share one.
-engine = create_async_engine(
-    settings.TEST_DATABASE_URL,
-    echo=settings.TEST_DB_ECHO,
-    poolclass=StaticPool,
-    connect_args={"check_same_thread": False},
-)
-enable_sqlite_foreign_keys(engine)
+# alembic_version is not in Base.metadata, so it survives the cleanup
+TABLES = ", ".join(f'"{table.name}"' for table in Base.metadata.sorted_tables)
 
-TestSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+@pytest.fixture(scope="session")
+def database_url(worker_id: str) -> Generator[str, None, None]:
+    """One database per xdist worker (cinema_test_gw0, ...; cinema_test_master without xdist).
+
+    The schema comes from the real migrations, so every test run also checks that they apply on Postgres.
+    """
+    base_name = settings.TEST_DATABASE_URL.rsplit("/", 1)[-1]
+    url = with_database(settings.TEST_DATABASE_URL, f"{base_name}_{worker_id}")
+    create_database(url)
+    alembic(url, ("upgrade", "head"))
+    yield url
+    drop_database(url)
+
+
+@pytest.fixture(scope="session")
+def engine(database_url: str) -> AsyncEngine:
+    # NullPool: pytest-asyncio gives every test its own event loop, and an asyncpg connection
+    # is bound to the loop it was opened in. Without a pool every session opens a fresh connection.
+    return create_async_engine(database_url, echo=settings.TEST_DB_ECHO, poolclass=NullPool)
+
+
+@pytest.fixture(scope="session")
+def session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(bind=engine, expire_on_commit=False)
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def prepare_database() -> AsyncGenerator[None, None]:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
+async def clean_database(engine: AsyncEngine) -> None:
+    """Empty all tables before each test (not after: a crashed test must not break the next one).
 
+    RESTART IDENTITY resets ids, so the groups get ids 1, 2, 3 again and TEST_USER_GROUP_ID stays valid.
+    Groups are re-inserted because some tests delete them.
+    """
+    async with engine.begin() as conn:
+        await conn.execute(text(f"TRUNCATE {TABLES} RESTART IDENTITY CASCADE"))
         await conn.execute(insert(UserGroup), [{"name": group} for group in UserGroupEnum])
-    yield
 
 
 @pytest_asyncio.fixture()
-async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    async with TestSessionLocal() as session:
-        yield session
-
-
-async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with TestSessionLocal() as session:
+async def db_session(session_factory: async_sessionmaker[AsyncSession]) -> AsyncGenerator[AsyncSession, None]:
+    async with session_factory() as session:
         yield session
 
 
@@ -74,7 +90,13 @@ def email_sender() -> FakeEmailSender:
 
 
 @pytest_asyncio.fixture()
-async def client(email_sender: FakeEmailSender) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    email_sender: FakeEmailSender, session_factory: async_sessionmaker[AsyncSession]
+) -> AsyncGenerator[AsyncClient, None]:
+    async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
+        async with session_factory() as session:
+            yield session
+
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_email_sender] = lambda: email_sender
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac_client:

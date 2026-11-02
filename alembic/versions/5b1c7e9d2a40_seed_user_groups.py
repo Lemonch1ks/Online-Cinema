@@ -21,7 +21,7 @@ GROUPS = ('USER', 'MODERATOR', 'ADMIN')
 
 # Must match the real column type: on PostgreSQL `name` is the native enum type `usergroupenum`,
 # and Postgres does not cast VARCHAR to an enum implicitly. sa.table() never emits CREATE TYPE,
-# so the type created in ea86cc9694ae is reused. On SQLite this is a plain VARCHAR, as before.
+# so the type created in ea86cc9694ae is reused.
 user_groups = sa.table('user_groups', sa.column('name', sa.Enum(*GROUPS, name='usergroupenum')))
 
 

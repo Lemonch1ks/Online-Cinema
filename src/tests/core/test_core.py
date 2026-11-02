@@ -1,11 +1,13 @@
-from types import SimpleNamespace
-
 import pytest
-from sqlalchemy import text
+from pydantic import ValidationError
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.models import ActivationToken, RefreshToken, User
 from src.core import database
-from src.core.config import settings
+from src.core.config import Settings, settings
+from src.tests.utils import create_activation_token
 
 
 # --- config ---
@@ -13,7 +15,6 @@ from src.core.config import settings
 @pytest.mark.parametrize(
     ("async_url", "sync_url"),
     [
-        ("sqlite+aiosqlite:///cinema.db", "sqlite:///cinema.db"),
         ("postgresql+asyncpg://user:pass@db:5432/cinema", "postgresql+psycopg://user:pass@db:5432/cinema"),
         ("mysql+pymysql://user:pass@db/cinema", "mysql+pymysql://user:pass@db/cinema"),  # unknown driver kept as is
     ],
@@ -23,10 +24,21 @@ def test_sync_database_url(async_url, sync_url):
     assert settings.model_copy(update={"DATABASE_URL": async_url}).SYNC_DATABASE_URL == sync_url
 
 
-def test_database_url_defaults_to_sqlite_file():
-    fresh = type(settings)(DATABASE_URL="")
+def test_database_url_is_required(monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    required = {
+        "SECRET_KEY": "x",
+        "EMAIL_HOSTNAME": "localhost",
+        "EMAIL_PORT": 1025,
+        "EMAIL_USERNAME": "noreply@example.com",
+        "EMAIL_PASSWORD": "",
+        "EMAIL_USE_TLS": False,
+    }
 
-    assert fresh.DATABASE_URL == f"sqlite+aiosqlite:///{fresh.DB_PATH.as_posix()}"
+    with pytest.raises(ValidationError) as error:
+        Settings(_env_file=None, **required)
+
+    assert [e["loc"] for e in error.value.errors()] == [("DATABASE_URL",)]
 
 
 def test_link_endpoints_are_built_from_base_url():
@@ -45,14 +57,19 @@ async def test_get_db_yields_session_and_closes_it():
     await generator.aclose()
 
 
-def test_enable_sqlite_foreign_keys_skips_other_dialects():
-    # a non-sqlite engine has no sync_engine here: touching it would raise AttributeError
-    fake_engine = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+async def test_deleting_user_cascades_to_tokens(db_session, active_user, auth_tokens):
+    # ON DELETE CASCADE is done by Postgres itself: a Core DELETE bypasses the ORM relationship cascades
+    await create_activation_token(db_session, active_user)
 
-    database.enable_sqlite_foreign_keys(fake_engine)
+    await db_session.execute(delete(User).where(User.id == active_user.id))
+    await db_session.commit()
+
+    for model in (ActivationToken, RefreshToken):
+        assert (await db_session.execute(select(func.count()).select_from(model))).scalar() == 0
 
 
-async def test_sqlite_foreign_keys_are_enforced(db_session):
-    result = await db_session.execute(text("PRAGMA foreign_keys"))
+async def test_foreign_keys_are_enforced(db_session):
+    db_session.add(RefreshToken(token="orphan", user_id=9999))
 
-    assert result.scalar() == 1
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
