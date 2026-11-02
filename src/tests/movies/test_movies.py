@@ -1,9 +1,10 @@
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select, update
 
 from src.core.config import settings
-from src.movies.models import Movie
+from src.movies.models import Director, Genre, Movie, Star
 from src.tests.utils import MOVIES_URL
 
 
@@ -48,6 +49,43 @@ async def test_movies_pagination_first_and_last_page(client, catalog):
     assert names(last) == ["Inception"]
     assert last.json()["prev_page"] == f"{MOVIES_URL}?page=1&per_page=3"
     assert last.json()["next_page"] is None
+
+
+async def test_movies_pagination_when_items_divide_evenly(client, catalog):
+    first = await client.get(MOVIES_URL, params={"page": 1, "per_page": 2})
+    last = await client.get(MOVIES_URL, params={"page": 2, "per_page": 2})
+
+    assert first.json()["total_pages"] == 2
+    assert first.json()["next_page"] == f"{MOVIES_URL}?page=2&per_page=2"
+    assert names(last) == ["Cast Away", "Inception"]
+    assert last.json()["next_page"] is None
+
+
+async def test_movies_per_page_maximum_is_accepted(client, catalog):
+    response = await client.get(MOVIES_URL, params={"per_page": settings.PAGINATION_MAX_PER_PAGE})
+
+    assert response.status_code == 200
+
+
+def make_movie(catalog, name: str, year: int, **extra) -> Movie:
+    return Movie(
+        name=name, year=year, time=100, imdb=7.0, votes=10, description=f"{name} description.",
+        price=Decimal("4.99"), certification_id=catalog["The Matrix"].certification_id, **extra,
+    )
+
+
+async def test_movies_are_ordered_by_id_even_with_ties_and_storage_order(client, db_session, catalog):
+    db_session.add(make_movie(catalog, "Twin of Matrix", 1999))
+    await db_session.commit()
+    matrix = catalog["The Matrix"]
+    await db_session.execute(update(Movie).where(Movie.id == matrix.id).values(votes=Movie.votes + 1))
+    await db_session.commit()
+
+    unsorted = await client.get(MOVIES_URL)
+    tied = await client.get(MOVIES_URL, params={"sort_by": "year", "order_type": "asc", "per_page": 3})
+
+    assert names(unsorted) == ["The Matrix", "Forrest Gump", "Cast Away", "Inception", "Twin of Matrix"]
+    assert names(tied) == ["Forrest Gump", "The Matrix", "Twin of Matrix"]
 
 
 async def test_movies_page_links_keep_filters(client, catalog):
@@ -100,14 +138,14 @@ async def test_movies_invalid_query_returns_422(client, catalog, params):
     ("params", "expected"),
     [
         ({"imdb_from": 8.7}, {"The Matrix", "Forrest Gump"}),
-        ({"imdb_to": 8.0}, {"Cast Away"}),
+        ({"imdb_to": 7.8}, {"Cast Away"}),
         ({"year_from": 2000}, {"Cast Away", "Inception"}),
         ({"year_to": 1999}, {"The Matrix", "Forrest Gump"}),
         ({"year_from": 1995, "year_to": 2005}, {"The Matrix", "Cast Away"}),
-        ({"meta_score_from": 80}, {"Forrest Gump", "Inception"}),
+        ({"meta_score_from": 82}, {"Forrest Gump", "Inception"}),
         ({"meta_score_to": 74}, {"The Matrix", "Cast Away"}),
-        ({"gross_from": 250}, {"Forrest Gump", "Inception"}),
-        ({"gross_to": 200}, {"The Matrix"}),
+        ({"gross_from": 292.6}, {"Forrest Gump", "Inception"}),
+        ({"gross_to": 171.5}, {"The Matrix"}),
         ({"year_from": 1995, "imdb_from": 8.0}, {"The Matrix", "Inception"}),
     ],
 )
@@ -209,6 +247,7 @@ async def test_movies_search(client, catalog, search, expected):
 
     assert response.status_code == 200
     assert names(response) == expected
+    assert response.json()["total_items"] == len(expected)
 
 
 async def test_movies_search_without_matches_returns_empty_page(client, catalog):
@@ -220,10 +259,20 @@ async def test_movies_search_without_matches_returns_empty_page(client, catalog)
 
 async def test_movies_search_filter_and_sort_combined(client, catalog):
     response = await client.get(
-        MOVIES_URL, params={"search_param": "tom hanks", "year_from": 1990, "sort_by": "year", "order_type": "desc"}
+        MOVIES_URL, params={"search_param": "tom hanks", "year_from": 1995, "sort_by": "year", "order_type": "desc"}
     )
 
-    assert names(response) == ["Cast Away", "Forrest Gump"]
+    assert names(response) == ["Cast Away"]
+
+
+async def test_search_matching_several_stars_of_one_movie_returns_it_once(client, db_session, catalog):
+    db_session.add(make_movie(catalog, "Two Toms", 2012, stars=[Star(name="Tom Hardy"), Star(name="Tom Holland")]))
+    await db_session.commit()
+
+    response = await client.get(MOVIES_URL, params={"search_param": "tom h"})
+
+    assert names(response) == ["Forrest Gump", "Cast Away", "Two Toms"]
+    assert response.json()["total_items"] == 3
 
 
 # --- GET /movies/{movie_id} ---
@@ -258,3 +307,11 @@ async def test_movie_details_non_integer_id_returns_422(client):
     response = await client.get(f"{MOVIES_URL}/abc")
 
     assert response.status_code == 422
+
+
+async def test_movie_details_with_null_scores(client, movie_without_scores):
+    response = await client.get(f"{MOVIES_URL}/{movie_without_scores.id}")
+
+    assert response.status_code == 200
+    assert response.json()["meta_score"] is None
+    assert response.json()["gross"] is None

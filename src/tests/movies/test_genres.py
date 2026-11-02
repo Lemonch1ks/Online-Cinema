@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from sqlalchemy import insert, select, update
 
 from src.movies.models import Genre, Movie, movie_genres_table
@@ -17,6 +19,21 @@ async def test_genres_list_counts_movies_including_empty_genres(client, catalog)
     assert response.status_code == 200
     counts = {genre["name"]: genre["movies_count"] for genre in response.json()["genres"]}
     assert counts == {"Action": 2, "Drama": 2, "Comedy": 0}
+
+
+async def test_genre_counts_with_a_movie_in_several_genres(client, db_session, catalog):
+    drama, comedy = (await db_session.execute(select(Genre).where(Genre.name.in_(["Drama", "Comedy"])).order_by(Genre.name))).scalars()
+    movie = Movie(
+        name="Dramedy", year=2015, time=95, imdb=7.1, votes=50, description="Funny and sad.",
+        price=Decimal("3.99"), certification_id=catalog["The Matrix"].certification_id, genres=[drama, comedy],
+    )
+    db_session.add(movie)
+    await db_session.commit()
+
+    response = await client.get(GENRES_URL)
+
+    counts = {genre["name"]: genre["movies_count"] for genre in response.json()["genres"]}
+    assert counts == {"Action": 2, "Drama": 3, "Comedy": 1}
 
 
 async def test_genres_list_is_ordered_by_id(client, db_session, catalog):
