@@ -1,18 +1,19 @@
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User, UserGroupEnum
 from src.auth.schemas import TokenData
 from src.auth.security import decode_access_token
-from src.auth.service import get_user
+from src.auth.service import authenticate_user, get_user
 from src.core.config import settings
 from src.core.database import get_db
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=settings.SECURITY_TOKEN_URL + "/token")
+docs_basic_auth = HTTPBasic(realm="API docs")
 
 
 async def get_current_user(
@@ -53,3 +54,19 @@ def require_role(min_role: UserGroupEnum):
         return user
 
     return checker
+
+
+async def verify_docs_access(
+        credentials: Annotated[HTTPBasicCredentials, Depends(docs_basic_auth)],
+        db: AsyncSession = Depends(get_db),
+) -> User:
+    user = await authenticate_user(db, credentials.username.lower(), credentials.password)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": 'Basic realm="API docs"'},
+        )
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+    return user

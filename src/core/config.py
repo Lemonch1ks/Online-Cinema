@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = 8
     PASSWORD_SPECIAL_CHARS: str = "@$!%*?&#"
 
+    # --- Docs (served under API_VERSION_PREFIX, behind HTTP Basic) ---
+    DOCS_URL: str = "/docs"
+    REDOC_URL: str = "/redoc"
+    OPENAPI_URL: str = "/openapi.json"
+
     # --- Email ---
     EMAIL_HOSTNAME: str
     EMAIL_PORT: int
