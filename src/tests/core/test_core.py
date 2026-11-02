@@ -32,6 +32,8 @@ def test_database_url_is_required(monkeypatch):
         "EMAIL_USERNAME": "noreply@example.com",
         "EMAIL_PASSWORD": "",
         "EMAIL_USE_TLS": False,
+        "S3_ACCESS_KEY": "key",
+        "S3_SECRET_KEY": "secret",
     }
 
     with pytest.raises(ValidationError) as error:

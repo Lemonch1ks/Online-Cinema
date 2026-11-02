@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
 from httpx2 import AsyncClient
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,6 +31,7 @@ ADMIN_USERS_URL = f"{settings.API_VERSION_PREFIX}/admins/users"
 
 MOVIES_URL = f"{settings.API_VERSION_PREFIX}/movies"
 GENRES_URL = f"{settings.API_VERSION_PREFIX}/genres"
+PROFILE_URL = f"{settings.API_VERSION_PREFIX}/profiles/me"
 
 
 async def create_user(
@@ -88,3 +91,10 @@ async def create_password_reset_token(db: AsyncSession, user: User, expired: boo
     db.add(token)
     await db.commit()
     return token
+
+
+def make_image(image_format: str = "PNG", size: tuple[int, int] = (8, 8)) -> bytes:
+    """A real, tiny image generated in memory, so tests do not need image files."""
+    buffer = BytesIO()
+    Image.new("RGB", size, color=(200, 30, 30)).save(buffer, format=image_format)
+    return buffer.getvalue()

@@ -12,6 +12,8 @@ from src.core.config import settings
 from src.core.database import Base, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
+from src.storage.dependencies import get_storage
+from src.storage.s3 import StorageError
 from src.tests.db import alembic, create_database, drop_database, with_database
 from src.tests.utils import LOGIN_URL, TEST_EMAIL, TEST_PASSWORD, create_user
 
@@ -86,9 +88,36 @@ def email_sender() -> FakeEmailSender:
     return FakeEmailSender()
 
 
+class FakeStorage:
+    """In-memory replacement of S3Storage. Set fail_upload / fail_delete to simulate a storage outage."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, tuple[bytes, str]] = {}
+        self.fail_upload = False
+        self.fail_delete = False
+
+    async def upload(self, key: str, data: bytes, content_type: str) -> None:
+        if self.fail_upload:
+            raise StorageError("storage is down")
+        self.files[key] = (data, content_type)
+
+    async def delete(self, key: str) -> None:
+        if self.fail_delete:
+            raise StorageError("storage is down")
+        self.files.pop(key, None)
+
+    def url(self, key: str) -> str:
+        return f"http://storage.test/avatars/{key}"
+
+
+@pytest.fixture()
+def storage() -> FakeStorage:
+    return FakeStorage()
+
+
 @pytest_asyncio.fixture()
 async def client(
-    email_sender: FakeEmailSender, session_factory: async_sessionmaker[AsyncSession]
+    email_sender: FakeEmailSender, storage: FakeStorage, session_factory: async_sessionmaker[AsyncSession]
 ) -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         async with session_factory() as session:
@@ -96,6 +125,7 @@ async def client(
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_email_sender] = lambda: email_sender
+    app.dependency_overrides[get_storage] = lambda: storage
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac_client:
         yield ac_client
     app.dependency_overrides.clear()

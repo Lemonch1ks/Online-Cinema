@@ -66,6 +66,17 @@ class Settings(BaseSettings):
     PASSWORD_RESET_REQUEST_SUBJECT: str = "Password Reset Request"
     PASSWORD_RESET_COMPLETE_SUBJECT: str = "Your Password Has Been Successfully Reset"
 
+    # --- File storage (S3 API: MinIO in docker-compose) ---
+    S3_ENDPOINT_URL: str = "http://localhost:9000"
+    S3_PUBLIC_URL: str = "http://localhost:9000"
+    S3_ACCESS_KEY: str
+    S3_SECRET_KEY: str
+    S3_BUCKET: str = "avatars"
+
+    # --- Profiles: avatar ---
+    AVATAR_MAX_SIZE: int = 1024 * 1024
+    AVATAR_FORMATS: tuple[str, ...] = ("JPEG", "PNG")
+
     # --- Movies: pagination ---
     PAGINATION_DEFAULT_PER_PAGE: int = 10
     PAGINATION_MAX_PER_PAGE: int = 20
