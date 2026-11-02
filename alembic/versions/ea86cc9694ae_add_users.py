@@ -95,3 +95,9 @@ def downgrade() -> None:
     op.drop_table('users')
     op.drop_table('user_groups')
     # ### end Alembic commands ###
+
+    # Autogenerate does not drop enum types. On PostgreSQL they are separate objects that outlive the
+    # tables, and the next upgrade would fail with 'type "usergroupenum" already exists'.
+    bind = op.get_bind()
+    sa.Enum(name='genderenum').drop(bind, checkfirst=True)
+    sa.Enum(name='usergroupenum').drop(bind, checkfirst=True)

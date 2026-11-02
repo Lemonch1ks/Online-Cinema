@@ -19,10 +19,14 @@ depends_on: Union[str, Sequence[str], None] = None
 
 GROUPS = ('USER', 'MODERATOR', 'ADMIN')
 
+# Must match the real column type: on PostgreSQL `name` is the native enum type `usergroupenum`,
+# and Postgres does not cast VARCHAR to an enum implicitly. sa.table() never emits CREATE TYPE,
+# so the type created in ea86cc9694ae is reused.
+user_groups = sa.table('user_groups', sa.column('name', sa.Enum(*GROUPS, name='usergroupenum')))
+
 
 def upgrade() -> None:
     """Insert the default user groups."""
-    user_groups = sa.table('user_groups', sa.column('name', sa.String()))
     existing = {row[0] for row in op.get_bind().execute(sa.select(user_groups.c.name))}
     missing = [{'name': name} for name in GROUPS if name not in existing]
     if missing:
@@ -31,5 +35,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Remove the default user groups."""
-    user_groups = sa.table('user_groups', sa.column('name', sa.String()))
     op.execute(user_groups.delete().where(user_groups.c.name.in_(GROUPS)))

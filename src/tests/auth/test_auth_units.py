@@ -90,20 +90,12 @@ def test_validate_token_by_time(delta, expected):
     assert validate_token_by_time(token) is expected
 
 
-def test_validate_token_by_time_handles_naive_datetime():
-    # SQLite returns naive datetimes, they are treated as UTC
-    naive_past = (datetime.now(timezone.utc) - timedelta(hours=1)).replace(tzinfo=None)
-    token = ActivationToken(token="t", user_id=1, expires_at=naive_past)
-
-    assert validate_token_by_time(token) is False
-
-
 @pytest.mark.parametrize(
     ("delta", "expected"),
     [(timedelta(hours=1), True), (timedelta(hours=-1), False)],
 )
 def test_refresh_token_validity(delta, expected):
-    token = RefreshToken(token="t", user_id=1, expires_at=(datetime.now(timezone.utc) + delta).replace(tzinfo=None))
+    token = RefreshToken(token="t", user_id=1, expires_at=datetime.now(timezone.utc) + delta)
 
     assert token.check_if_token_is_valid() is expected
 

@@ -30,11 +30,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str) -> User
 
 
 def validate_token_by_time(token: ActivationToken | PasswordResetToken) -> bool:
-    expires_at = token.expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-
-    if expires_at < datetime.now(timezone.utc):
+    if token.expires_at < datetime.now(timezone.utc):
         return False
     return True
 
