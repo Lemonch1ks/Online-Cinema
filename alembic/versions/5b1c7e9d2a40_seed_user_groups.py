@@ -30,5 +30,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove the default user groups."""
+    """Remove the default user groups. Refuses while users still belong to them."""
+    users_count = op.get_bind().execute(sa.select(sa.func.count()).select_from(sa.table('users'))).scalar_one()
+    if users_count:
+        raise RuntimeError(
+            f"Cannot remove the default user groups: {users_count} users still belong to them. Delete the users first."
+        )
     op.execute(user_groups.delete().where(user_groups.c.name.in_(GROUPS)))
