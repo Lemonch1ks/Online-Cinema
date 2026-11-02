@@ -1,0 +1,107 @@
+name: Test Code
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+  POETRY_VERSION: "2.5.1"
+
+jobs:
+  lint:
+    name: Lint and type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install "poetry==${POETRY_VERSION}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root --no-interaction
+
+      - name: Ruff lint
+        run: poetry run ruff check .
+
+      - name: Ruff format
+        run: poetry run ruff format --check .
+
+      - name: Mypy
+        run: poetry run mypy
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cinema
+          POSTGRES_PASSWORD: cinema
+          POSTGRES_DB: cinema
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cinema -d cinema"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://cinema:cinema@localhost:5432/cinema
+      TEST_DATABASE_URL: postgresql+asyncpg://cinema:cinema@localhost:5432/cinema_test
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else
+      EMAIL_HOSTNAME: localhost
+      EMAIL_PORT: "1025"
+      EMAIL_USERNAME: noreply@cinema.test
+      EMAIL_PASSWORD: ""
+      EMAIL_USE_TLS: "false"
+      S3_ACCESS_KEY: ci-access-key
+      S3_SECRET_KEY: ci-secret-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install "poetry==${POETRY_VERSION}"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install --no-root --no-interaction
+
+      - name: Pytest with coverage
+        run: poetry run pytest -n 4 --cov --cov-report=term-missing
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compose file is valid
+        run: |
+          cp .env.sample .env
+          docker compose config --quiet
+
+      - name: Build the app image
+        run: docker compose build app
