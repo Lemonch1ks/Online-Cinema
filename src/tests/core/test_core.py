@@ -4,10 +4,10 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.models import ActivationToken, RefreshToken, User
+from src.auth.models import ActivationToken, PasswordResetToken, RefreshToken, User, UserProfile
 from src.core import database
 from src.core.config import Settings, settings
-from src.tests.utils import create_activation_token
+from src.tests.utils import create_activation_token, create_password_reset_token
 
 
 # --- config ---
@@ -74,22 +74,35 @@ def test_login_link_points_to_a_page(frontend_url, expected):
 
 # --- database ---
 
-async def test_get_db_yields_session_and_closes_it():
+async def test_get_db_yields_session_and_closes_it(monkeypatch):
+    closed = []
+    original_close = AsyncSession.close
+
+    async def tracking_close(self):
+        closed.append(self)
+        await original_close(self)
+
+    monkeypatch.setattr(AsyncSession, "close", tracking_close)
     generator = database.get_db()
     session = await anext(generator)
 
     assert isinstance(session, AsyncSession)
+    assert closed == []
     await generator.aclose()
+    assert closed == [session]
 
 
-async def test_deleting_user_cascades_to_tokens(db_session, active_user, auth_tokens):
+async def test_deleting_user_cascades_to_tokens_and_profile(db_session, active_user, auth_tokens):
     await create_activation_token(db_session, active_user)
+    await create_password_reset_token(db_session, active_user)
+    db_session.add(UserProfile(user_id=active_user.id, first_name="Anna"))
+    await db_session.commit()
 
     await db_session.execute(delete(User).where(User.id == active_user.id))
     await db_session.commit()
 
-    for model in (ActivationToken, RefreshToken):
-        assert (await db_session.execute(select(func.count()).select_from(model))).scalar() == 0
+    for model in (ActivationToken, PasswordResetToken, RefreshToken, UserProfile):
+        assert (await db_session.execute(select(func.count()).select_from(model))).scalar() == 0, model.__name__
 
 
 async def test_foreign_keys_are_enforced(db_session):

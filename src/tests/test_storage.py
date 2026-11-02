@@ -132,5 +132,7 @@ def test_get_storage_is_built_from_settings_and_cached():
     storage = get_storage()
 
     assert isinstance(storage, S3Storage)
+    assert storage._endpoint_url == settings.S3_ENDPOINT_URL
+    assert storage._bucket == settings.S3_BUCKET
     assert storage.url("k") == f"{settings.S3_PUBLIC_URL.rstrip('/')}/{settings.S3_BUCKET}/k"
     assert get_storage() is storage

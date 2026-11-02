@@ -107,15 +107,15 @@ def sent_message():
 
 
 @pytest.mark.parametrize(
-    ("method", "subject"),
+    ("method", "subject", "title"),
     [
-        ("send_activation_email", settings.ACTIVATION_REQUEST_SUBJECT),
-        ("send_activation_complete_email", settings.ACTIVATION_COMPLETE_SUBJECT),
-        ("send_password_reset_email", settings.PASSWORD_RESET_REQUEST_SUBJECT),
-        ("send_password_reset_complete_email", settings.PASSWORD_RESET_COMPLETE_SUBJECT),
+        ("send_activation_email", settings.ACTIVATION_REQUEST_SUBJECT, "Registration"),
+        ("send_activation_complete_email", settings.ACTIVATION_COMPLETE_SUBJECT, "Account Activated"),
+        ("send_password_reset_email", settings.PASSWORD_RESET_REQUEST_SUBJECT, "Password Reset Request"),
+        ("send_password_reset_complete_email", settings.PASSWORD_RESET_COMPLETE_SUBJECT, "Password Successfully Reset"),
     ],
 )
-async def test_email_is_rendered_and_sent(method, subject):
+async def test_email_is_rendered_and_sent(method, subject, title):
     await getattr(make_sender(), method)(RECIPIENT, LINK)
 
     sender, recipients, message, html = sent_message()
@@ -127,6 +127,7 @@ async def test_email_is_rendered_and_sent(method, subject):
     assert message.get_payload()[0].get_content_type() == "text/html"
     assert LINK in html
     assert RECIPIENT in html
+    assert f"<title>{title}</title>" in html
 
 
 async def test_smtp_session_without_tls(fake_smtp):

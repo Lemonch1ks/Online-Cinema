@@ -2,6 +2,7 @@ import aiosmtplib
 import pytest
 from kombu.exceptions import OperationalError
 
+from src.core.config import settings
 from src.main import app
 from src.notifications import tasks as email_tasks
 from src.notifications.dependencies import get_email_sender
@@ -125,4 +126,36 @@ def test_smtp_sender_is_built_from_settings_and_cached():
     sender = email_tasks.get_smtp_sender()
 
     assert isinstance(sender, EmailSender)
+    assert (sender._hostname, sender._port, sender._email, sender._password, sender._use_tls) == (
+        settings.EMAIL_HOSTNAME, settings.EMAIL_PORT, settings.EMAIL_USERNAME, settings.EMAIL_PASSWORD, settings.EMAIL_USE_TLS,
+    )
+    assert (
+        sender._activation_email_template_name, sender._activation_complete_email_template_name,
+        sender._password_email_template_name, sender._password_complete_email_template_name,
+    ) == (
+        settings.ACTIVATION_REQUEST_TEMPLATE_NAME, settings.ACTIVATION_COMPLETE_TEMPLATE_NAME,
+        settings.PASSWORD_RESET_REQUEST_TEMPLATE_NAME, settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
+    )
+    assert (
+        sender._activation_email_subject, sender._activation_complete_email_subject,
+        sender._password_email_subject, sender._password_complete_email_subject,
+    ) == (
+        settings.ACTIVATION_REQUEST_SUBJECT, settings.ACTIVATION_COMPLETE_SUBJECT,
+        settings.PASSWORD_RESET_REQUEST_SUBJECT, settings.PASSWORD_RESET_COMPLETE_SUBJECT,
+    )
     assert email_tasks.get_smtp_sender() is sender
+
+
+def test_smtp_sender_follows_non_default_settings(monkeypatch):
+    for name, value in {"EMAIL_HOSTNAME": "smtp.real.example", "EMAIL_PORT": 2525, "EMAIL_USE_TLS": True,
+                        "EMAIL_PASSWORD": "app-password"}.items():
+        monkeypatch.setattr(settings, name, value)
+    email_tasks.get_smtp_sender.cache_clear()
+    try:
+        sender = email_tasks.get_smtp_sender()
+
+        assert (sender._hostname, sender._port, sender._use_tls, sender._password) == (
+            "smtp.real.example", 2525, True, "app-password",
+        )
+    finally:
+        email_tasks.get_smtp_sender.cache_clear()
