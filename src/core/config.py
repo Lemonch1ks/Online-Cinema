@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     S3_ACCESS_KEY: str
     S3_SECRET_KEY: str
     S3_BUCKET: str = "avatars"
+    ORPHAN_AVATAR_MIN_AGE: timedelta = timedelta(hours=1)
 
     # --- Profiles: avatar ---
     AVATAR_MAX_SIZE: int = 1024 * 1024

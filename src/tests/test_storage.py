@@ -1,4 +1,6 @@
 """Unit tests for S3Storage with a fake S3 client (like FakeSMTP for emails): no MinIO needed."""
+from datetime import datetime, timezone
+
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 
@@ -10,8 +12,9 @@ from src.storage.s3 import S3Storage, StorageError
 class FakeS3Client:
     """Mimics the aioboto3 S3 client: an async context manager with put_object / delete_object."""
 
-    def __init__(self, error: Exception | None = None) -> None:
+    def __init__(self, error: Exception | None = None, pages: list[list[dict]] | None = None) -> None:
         self.error = error
+        self.pages = pages or []
         self.calls: list[tuple[str, dict]] = []
 
     async def __aenter__(self) -> "FakeS3Client":
@@ -32,10 +35,21 @@ class FakeS3Client:
     async def delete_object(self, **kwargs) -> dict:
         return await self._call("delete_object", **kwargs)
 
+    def get_paginator(self, operation: str) -> "FakeS3Client":
+        assert operation == "list_objects_v2"
+        return self
 
-def make_storage(monkeypatch, error: Exception | None = None, public_url: str = "http://localhost:9000"):
+    async def paginate(self, **kwargs):
+        self.calls.append(("list_objects_v2", kwargs))
+        for page in self.pages:
+            if self.error:
+                raise self.error
+            yield {"Contents": page} if page else {}
+
+
+def make_storage(monkeypatch, error: Exception | None = None, public_url: str = "http://localhost:9000", pages=None):
     storage = S3Storage("http://minio:9000", public_url, "key", "secret", "avatars")
-    client = FakeS3Client(error)
+    client = FakeS3Client(error, pages)
     created_with: list[dict] = []
 
     def fake_client(service_name, **kwargs):
@@ -61,6 +75,31 @@ async def test_delete_removes_object(monkeypatch):
     await storage.delete("1/abc.png")
 
     assert client.calls == [("delete_object", {"Bucket": "avatars", "Key": "1/abc.png"})]
+
+
+async def test_list_objects_reads_all_pages(monkeypatch):
+    t1, t2, t3 = (datetime(2026, 1, day, tzinfo=timezone.utc) for day in (1, 2, 3))
+    pages = [
+        [{"Key": "1/a.png", "LastModified": t1}, {"Key": "2/b.jpg", "LastModified": t2}],
+        [{"Key": "3/c.png", "LastModified": t3}],
+        [],
+    ]
+    storage, client, _ = make_storage(monkeypatch, pages=pages)
+
+    objects = await storage.list_objects()
+
+    assert objects == [("1/a.png", t1), ("2/b.jpg", t2), ("3/c.png", t3)]
+    assert client.calls == [("list_objects_v2", {"Bucket": "avatars"})]
+
+
+async def test_list_objects_wraps_s3_errors(monkeypatch):
+    error = ClientError({"Error": {"Code": "NoSuchBucket", "Message": "gone"}}, "ListObjectsV2")
+    storage, _, _ = make_storage(monkeypatch, error=error, pages=[[{"Key": "k", "LastModified": None}]])
+
+    with pytest.raises(StorageError) as raised:
+        await storage.list_objects()
+
+    assert raised.value.__cause__ is error
 
 
 @pytest.mark.parametrize(

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import aioboto3
 from botocore.exceptions import BotoCoreError, ClientError
 
@@ -34,6 +36,16 @@ class S3Storage:
                 await s3.delete_object(Bucket=self._bucket, Key=key)
         except (BotoCoreError, ClientError) as error:
             raise StorageError(f"Failed to delete {key}: {error}") from error
+
+    async def list_objects(self) -> list[tuple[str, datetime]]:
+        try:
+            async with self._client() as s3:
+                objects = []
+                async for page in s3.get_paginator("list_objects_v2").paginate(Bucket=self._bucket):
+                    objects += [(item["Key"], item["LastModified"]) for item in page.get("Contents", [])]
+                return objects
+        except (BotoCoreError, ClientError) as error:
+            raise StorageError(f"Failed to list objects: {error}") from error
 
     def url(self, key: str) -> str:
         return f"{self._public_url}/{self._bucket}/{key}"
