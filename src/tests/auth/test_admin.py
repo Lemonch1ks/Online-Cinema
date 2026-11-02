@@ -56,6 +56,7 @@ def activate_url(user_id: int) -> str:
 
 # --- access control (router-level require_role(ADMIN)) ---
 
+
 @pytest.mark.parametrize("group", [UserGroupEnum.USER, UserGroupEnum.MODERATOR])
 async def test_non_admin_gets_403(client, db_session, target_user, group):
     await create_user_in_group(db_session, "caller@example.com", group)
@@ -91,11 +92,10 @@ async def test_role_is_read_from_db_not_from_token(client, db_session, target_us
 
 # --- PATCH /users/{user_id}/group ---
 
+
 @pytest.mark.parametrize("new_group", list(UserGroupEnum))
 async def test_admin_changes_user_group(client, db_session, target_user, admin_headers, new_group):
-    response = await client.patch(
-        group_url(target_user.id), json={"new_group_rank": new_group}, headers=admin_headers
-    )
+    response = await client.patch(group_url(target_user.id), json={"new_group_rank": new_group}, headers=admin_headers)
 
     assert response.status_code == 200
     assert response.json() == {
@@ -144,6 +144,7 @@ async def test_change_group_invalid_payload_returns_422(client, target_user, adm
 
 
 # --- POST /users/{user_id}/activate ---
+
 
 async def test_admin_activates_user_and_removes_token(client, db_session, email_sender, inactive_target, admin_headers):
     await create_activation_token(db_session, inactive_target)

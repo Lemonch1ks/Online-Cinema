@@ -1,9 +1,10 @@
-from sqlalchemy.orm import mapped_column, Mapped, relationship
-from sqlalchemy import String, Float, Integer, DECIMAL, ForeignKey, Uuid, UniqueConstraint, Text, Table, Column
-from src.core.database import Base
-from uuid import UUID, uuid4
 from decimal import Decimal
+from uuid import UUID, uuid4
 
+from sqlalchemy import DECIMAL, Column, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint, Uuid
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.core.database import Base
 
 movie_genres_table = Table(
     "movie_genres",
@@ -29,10 +30,8 @@ movie_stars_table = Table(
 
 
 class Movie(Base):
-    __tablename__ = 'movies'
-    __table_args__ = (
-        UniqueConstraint("name", "year", "time", name="unique_name_time_year"),
-    )
+    __tablename__ = "movies"
+    __table_args__ = (UniqueConstraint("name", "year", "time", name="unique_name_time_year"),)
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     uuid: Mapped[UUID] = mapped_column(Uuid, unique=True, default=uuid4, nullable=False)
 
@@ -44,35 +43,39 @@ class Movie(Base):
     meta_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     gross: Mapped[float | None] = mapped_column(Float, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    price: Mapped[Decimal] = mapped_column(DECIMAL(10,2), nullable=False)
+    price: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
     certification: Mapped["Certification"] = relationship(back_populates="movies")
     genres: Mapped[list["Genre"]] = relationship(secondary=movie_genres_table, back_populates="movies")
     stars: Mapped[list["Star"]] = relationship(secondary=movie_stars_table, back_populates="movies")
     directors: Mapped[list["Director"]] = relationship(secondary=movie_directors_table, back_populates="movies")
 
+
 class Certification(Base):
-    __tablename__ = 'certifications'
+    __tablename__ = "certifications"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     movies: Mapped[list["Movie"]] = relationship(back_populates="certification")
 
 
 class Genre(Base):
-    __tablename__ = 'genres'
+    __tablename__ = "genres"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    movies: Mapped[list["Movie"]] = relationship(secondary=movie_genres_table, back_populates="genres", order_by="Movie.id")
+    movies: Mapped[list["Movie"]] = relationship(
+        secondary=movie_genres_table, back_populates="genres", order_by="Movie.id"
+    )
+
 
 class Star(Base):
-    __tablename__ = 'stars'
+    __tablename__ = "stars"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     movies: Mapped[list["Movie"]] = relationship(secondary=movie_stars_table, back_populates="stars")
 
 
 class Director(Base):
-    __tablename__ = 'directors'
+    __tablename__ = "directors"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
     movies: Mapped[list["Movie"]] = relationship(secondary=movie_directors_table, back_populates="directors")

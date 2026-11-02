@@ -1,4 +1,5 @@
 """If the SMTP server is down, endpoints must still succeed: the email error is only logged."""
+
 import logging
 
 import pytest

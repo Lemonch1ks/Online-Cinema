@@ -1,26 +1,20 @@
 from typing import Annotated
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.movies.filters import MoviesQuery
-from src.core.database import get_db
-
-from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
+from src.core.database import get_db
+from src.movies.filters import MoviesQuery
 from src.movies.models import (
     Movie,
 )
-
 from src.movies.schemas import (
-    MovieListResponseSchema,
-    MovieListItemSchema,
     MovieDetailItemSchema,
+    MovieListItemSchema,
+    MovieListResponseSchema,
 )
-
-
-from fastapi import APIRouter, Query, Depends, HTTPException, Request
-
 
 router = APIRouter()
 
@@ -30,17 +24,17 @@ router = APIRouter()
     response_model=MovieListResponseSchema,
     summary="Get Movie List",
     description=(
-            "<h3>This endpoint retrieves a paginated list of movies from the database. "
-            "Clients can specify the `page` number and the number of items per page using `per_page`. "
-            "Clients can use filters with query params"
-            "The response includes details about the movies, total pages, and total items, "
-            "along with links to the previous and next pages if applicable.</h3>"
+        "<h3>This endpoint retrieves a paginated list of movies from the database. "
+        "Clients can specify the `page` number and the number of items per page using `per_page`. "
+        "Clients can use filters with query params"
+        "The response includes details about the movies, total pages, and total items, "
+        "along with links to the previous and next pages if applicable.</h3>"
     ),
 )
 async def get_movies(
-        request: Request,
-        query_params: Annotated[MoviesQuery, Query()],
-        db: AsyncSession = Depends(get_db),
+    request: Request,
+    query_params: Annotated[MoviesQuery, Query()],
+    db: AsyncSession = Depends(get_db),
 ) -> MovieListResponseSchema:
 
     page = query_params.page
@@ -86,17 +80,13 @@ async def get_movies(
     responses={
         404: {
             "description": "Movie with the given ID was not found.",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "No movies with id:1 found."}
-                }
-            },
+            "content": {"application/json": {"example": {"detail": "No movies with id:1 found."}}},
         }
-    }
+    },
 )
 async def get_movie_details(
-        movie_id: int,
-        db: AsyncSession = Depends(get_db),
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
 ) -> MovieDetailItemSchema:
     stmt = (
         select(Movie)

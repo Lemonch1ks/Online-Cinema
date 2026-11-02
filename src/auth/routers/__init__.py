@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.auth.routers import accounts, tokens, users, admin, profiles
+from src.auth.routers import accounts, admin, profiles, tokens, users
 from src.core.config import settings
 
 router = APIRouter()

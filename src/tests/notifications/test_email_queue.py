@@ -36,6 +36,7 @@ def no_smtp(monkeypatch):
 
 # --- QueuedEmailSender ---
 
+
 @pytest.mark.parametrize(("method", "kind"), METHODS.items())
 async def test_queued_sender_only_enqueues(queued, no_smtp, method, kind):
     await getattr(QueuedEmailSender(), method)("user@example.com", LINK)
@@ -72,6 +73,7 @@ async def test_resend_enqueues_email_instead_of_sending_it(client, db_session, q
 
 
 # --- send_email task (runs in the worker) ---
+
 
 class RecordingSender:
     def __init__(self, fail: bool = False) -> None:
@@ -127,35 +129,54 @@ def test_smtp_sender_is_built_from_settings_and_cached():
 
     assert isinstance(sender, EmailSender)
     assert (sender._hostname, sender._port, sender._email, sender._password, sender._use_tls) == (
-        settings.EMAIL_HOSTNAME, settings.EMAIL_PORT, settings.EMAIL_USERNAME, settings.EMAIL_PASSWORD, settings.EMAIL_USE_TLS,
+        settings.EMAIL_HOSTNAME,
+        settings.EMAIL_PORT,
+        settings.EMAIL_USERNAME,
+        settings.EMAIL_PASSWORD,
+        settings.EMAIL_USE_TLS,
     )
     assert (
-        sender._activation_email_template_name, sender._activation_complete_email_template_name,
-        sender._password_email_template_name, sender._password_complete_email_template_name,
+        sender._activation_email_template_name,
+        sender._activation_complete_email_template_name,
+        sender._password_email_template_name,
+        sender._password_complete_email_template_name,
     ) == (
-        settings.ACTIVATION_REQUEST_TEMPLATE_NAME, settings.ACTIVATION_COMPLETE_TEMPLATE_NAME,
-        settings.PASSWORD_RESET_REQUEST_TEMPLATE_NAME, settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
+        settings.ACTIVATION_REQUEST_TEMPLATE_NAME,
+        settings.ACTIVATION_COMPLETE_TEMPLATE_NAME,
+        settings.PASSWORD_RESET_REQUEST_TEMPLATE_NAME,
+        settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
     )
     assert (
-        sender._activation_email_subject, sender._activation_complete_email_subject,
-        sender._password_email_subject, sender._password_complete_email_subject,
+        sender._activation_email_subject,
+        sender._activation_complete_email_subject,
+        sender._password_email_subject,
+        sender._password_complete_email_subject,
     ) == (
-        settings.ACTIVATION_REQUEST_SUBJECT, settings.ACTIVATION_COMPLETE_SUBJECT,
-        settings.PASSWORD_RESET_REQUEST_SUBJECT, settings.PASSWORD_RESET_COMPLETE_SUBJECT,
+        settings.ACTIVATION_REQUEST_SUBJECT,
+        settings.ACTIVATION_COMPLETE_SUBJECT,
+        settings.PASSWORD_RESET_REQUEST_SUBJECT,
+        settings.PASSWORD_RESET_COMPLETE_SUBJECT,
     )
     assert email_tasks.get_smtp_sender() is sender
 
 
 def test_smtp_sender_follows_non_default_settings(monkeypatch):
-    for name, value in {"EMAIL_HOSTNAME": "smtp.real.example", "EMAIL_PORT": 2525, "EMAIL_USE_TLS": True,
-                        "EMAIL_PASSWORD": "app-password"}.items():
+    for name, value in {
+        "EMAIL_HOSTNAME": "smtp.real.example",
+        "EMAIL_PORT": 2525,
+        "EMAIL_USE_TLS": True,
+        "EMAIL_PASSWORD": "app-password",
+    }.items():
         monkeypatch.setattr(settings, name, value)
     email_tasks.get_smtp_sender.cache_clear()
     try:
         sender = email_tasks.get_smtp_sender()
 
         assert (sender._hostname, sender._port, sender._use_tls, sender._password) == (
-            "smtp.real.example", 2525, True, "app-password",
+            "smtp.real.example",
+            2525,
+            True,
+            "app-password",
         )
     finally:
         email_tasks.get_smtp_sender.cache_clear()

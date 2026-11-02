@@ -1,6 +1,7 @@
 """Celery tasks: called directly, no Redis or worker needed."""
+
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from celery.schedules import crontab
@@ -37,7 +38,9 @@ async def remaining_tokens(db_session) -> list[str]:
 
 async def test_deletes_only_expired_activation_tokens(db_session, caplog):
     expired = [
-        await create_activation_token(db_session, await create_user(db_session, email=f"old{i}@example.com"), expired=True)
+        await create_activation_token(
+            db_session, await create_user(db_session, email=f"old{i}@example.com"), expired=True
+        )
         for i in range(2)
     ]
     valid = await create_activation_token(db_session, await create_user(db_session, email="new@example.com"))
@@ -113,12 +116,14 @@ def test_cleanup_deletes_only_old_unreferenced_avatars(monkeypatch, caplog):
         session.add(UserProfile(user_id=user.id, avatar=f"{user.id}/kept.png"))
         session.commit()
         user_id = user.id
-    old = datetime.now(timezone.utc) - timedelta(days=2)
-    storage = ListingStorage({
-        f"{user_id}/kept.png": old,
-        f"{user_id}/orphan.png": old,
-        f"{user_id}/just-uploaded.png": datetime.now(timezone.utc),
-    })
+    old = datetime.now(UTC) - timedelta(days=2)
+    storage = ListingStorage(
+        {
+            f"{user_id}/kept.png": old,
+            f"{user_id}/orphan.png": old,
+            f"{user_id}/just-uploaded.png": datetime.now(UTC),
+        }
+    )
     monkeypatch.setattr(src.tasks, "get_storage", lambda: storage)
 
     with caplog.at_level(logging.INFO):

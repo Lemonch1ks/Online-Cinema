@@ -1,5 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
 
-    #--- Celery ---
+    # --- Celery ---
 
     BROKER_URL: str = "redis://localhost:6379"
 
@@ -93,7 +94,6 @@ class Settings(BaseSettings):
     def SYNC_DATABASE_URL(self) -> str:
         return to_sync_url(self.DATABASE_URL)
 
-
     @property
     def SECURITY_TOKEN_URL(self) -> str:
         return f"{self.API_VERSION_PREFIX}/security"
@@ -119,4 +119,4 @@ class Settings(BaseSettings):
         return f"{self.FRONTEND_URL.rstrip('/')}/login"
 
 
-settings = Settings() # type: ignore
+settings = Settings()  # type: ignore

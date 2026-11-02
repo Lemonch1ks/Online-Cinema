@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -39,7 +39,7 @@ async def test_register_creates_inactive_user(client, db_session, email_sender):
     recipient, link = email_sender.activation_emails[0]
     assert recipient == "new.user@example.com"
     assert link == f"{settings.ACTIVATION_LINK_ENDPOINT}/{user.activation_token.token}"
-    expected_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+    expected_expiry = datetime.now(UTC) + timedelta(hours=24)
     assert abs(user.activation_token.expires_at - expected_expiry) < timedelta(minutes=1)
 
 

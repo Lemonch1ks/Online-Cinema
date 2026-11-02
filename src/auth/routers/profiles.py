@@ -83,10 +83,10 @@ async def delete_avatar_quietly(storage: S3Storage, key: str) -> None:
     responses={409: {"description": "You already have a profile."}, **UPLOAD_FAILED},
 )
 async def create_profile(
-        data: Annotated[ProfileFormSchema, Form()],
-        user: Annotated[User, Depends(get_current_active_user)],
-        db: AsyncSession = Depends(get_db),
-        storage: S3Storage = Depends(get_storage),
+    data: Annotated[ProfileFormSchema, Form()],
+    user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+    storage: S3Storage = Depends(get_storage),
 ) -> ProfileSchema:
     if await get_profile(db, user) is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have a profile.")
@@ -115,9 +115,9 @@ async def create_profile(
 
 @router.get("/me", response_model=ProfileSchema, summary="Get your profile", responses=PROFILE_NOT_FOUND)
 async def read_profile(
-        user: Annotated[User, Depends(get_current_active_user)],
-        db: AsyncSession = Depends(get_db),
-        storage: S3Storage = Depends(get_storage),
+    user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+    storage: S3Storage = Depends(get_storage),
 ) -> ProfileSchema:
     profile = await get_profile(db, user)
     if profile is None:
@@ -133,10 +133,10 @@ async def read_profile(
     responses={**PROFILE_NOT_FOUND, **UPLOAD_FAILED},
 )
 async def update_profile(
-        data: Annotated[ProfileFormSchema, Form()],
-        user: Annotated[User, Depends(get_current_active_user)],
-        db: AsyncSession = Depends(get_db),
-        storage: S3Storage = Depends(get_storage),
+    data: Annotated[ProfileFormSchema, Form()],
+    user: Annotated[User, Depends(get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+    storage: S3Storage = Depends(get_storage),
 ) -> ProfileSchema:
     profile = await get_profile(db, user, for_update=True)
     if profile is None:

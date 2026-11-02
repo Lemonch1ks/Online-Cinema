@@ -9,8 +9,8 @@ from src.core import database
 from src.core.config import Settings, settings
 from src.tests.utils import create_activation_token, create_password_reset_token
 
-
 # --- config ---
+
 
 @pytest.mark.parametrize(
     ("async_url", "sync_url"),
@@ -36,7 +36,9 @@ REQUIRED_SETTINGS = {
 
 
 def make_settings(**overrides) -> Settings:
-    return Settings(_env_file=None, **{"DATABASE_URL": "postgresql+asyncpg://u:p@db/cinema", **REQUIRED_SETTINGS, **overrides})
+    return Settings(
+        _env_file=None, **{"DATABASE_URL": "postgresql+asyncpg://u:p@db/cinema", **REQUIRED_SETTINGS, **overrides}
+    )
 
 
 def test_database_url_is_required(monkeypatch):
@@ -58,7 +60,6 @@ def test_derived_urls_follow_api_prefix_and_base_url():
     assert custom.PASSWORD_RESET_LINK_ENDPOINT == "https://cinema.example/api/v2/accounts/password_reset"
 
 
-
 @pytest.mark.parametrize(
     ("frontend_url", "expected"),
     [
@@ -75,7 +76,9 @@ def test_login_link_points_to_frontend_login_page(frontend_url, expected):
 def test_frontend_url_has_a_default():
     assert make_settings().LOGIN_LINK_ENDPOINT == "http://localhost:3000/login"
 
+
 # --- database ---
+
 
 async def test_get_db_yields_session_and_closes_it(monkeypatch):
     closed = []

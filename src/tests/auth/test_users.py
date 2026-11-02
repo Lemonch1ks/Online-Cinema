@@ -9,6 +9,7 @@ NEW_PASSWORD = "NewStrongPass2!"
 
 # --- POST /change_password ---
 
+
 async def test_change_password_updates_password_and_revokes_refresh_tokens(
     client, db_session, active_user, auth_tokens, auth_headers
 ):
@@ -20,8 +21,8 @@ async def test_change_password_updates_password_and_revokes_refresh_tokens(
 
     assert response.status_code == 204
     refresh_tokens = (
-        await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == active_user.id))
-    ).scalars().all()
+        (await db_session.execute(select(RefreshToken).where(RefreshToken.user_id == active_user.id))).scalars().all()
+    )
     assert refresh_tokens == []
 
     refresh = await client.post(REFRESH_URL, json={"refresh_token": auth_tokens["refresh_token"]})

@@ -1,7 +1,7 @@
 from datetime import date
 
 from fastapi import UploadFile
-from pydantic import BaseModel, EmailStr, Field, field_validator, AliasPath
+from pydantic import AliasPath, BaseModel, EmailStr, Field, field_validator
 
 from src.auth.models import GenderEnum, UserGroupEnum
 from src.auth.validators import validate_birth_date, validate_name, validate_password
@@ -91,6 +91,7 @@ class ProfileFormSchema(BaseModel):
     parameter (the model would then be expected as one form field named after the parameter).
     For PATCH only the fields that were sent are changed (model_fields_set).
     """
+
     first_name: str | None = Field(None, max_length=50)
     last_name: str | None = Field(None, max_length=50)
     gender: GenderEnum | None = None

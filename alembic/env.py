@@ -1,15 +1,12 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
-from alembic import context
-
-
-from src.core.config import settings
-from src.core.database import Base
 import src.auth.models  # noqa: F401  (register all models in Base.metadata)
 import src.movies.models  # noqa: F401
+from alembic import context
+from src.core.config import settings
+from src.core.database import Base
 
 config = context.config
 

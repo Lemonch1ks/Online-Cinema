@@ -2,8 +2,8 @@ from fastapi import FastAPI
 
 from src.auth.routers import router as auth_router
 from src.core.config import settings
-from src.movies.routers import router as movies_router
 from src.core.docs import router as docs_router
+from src.movies.routers import router as movies_router
 
 app = FastAPI(
     title=settings.APP_TITLE,

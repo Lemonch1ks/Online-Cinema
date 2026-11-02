@@ -17,8 +17,8 @@ docs_basic_auth = HTTPBasic(realm="API docs")
 
 
 async def get_current_user(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        db: AsyncSession = Depends(get_db),
+    token: Annotated[str, Depends(oauth2_scheme)],
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,8 +31,8 @@ async def get_current_user(
         if email is None:
             raise credentials_exception
         token_data = TokenData(email=email)
-    except InvalidTokenError:
-        raise credentials_exception
+    except InvalidTokenError as error:
+        raise credentials_exception from error
     user = await get_user(db=db, email=token_data.email)
     if user is None:
         raise credentials_exception
@@ -40,7 +40,7 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-        current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
     if not current_user.is_active:
         raise HTTPException(status_code=403, detail="Inactive user")
@@ -57,8 +57,8 @@ def require_role(min_role: UserGroupEnum):
 
 
 async def verify_docs_access(
-        credentials: Annotated[HTTPBasicCredentials, Depends(docs_basic_auth)],
-        db: AsyncSession = Depends(get_db),
+    credentials: Annotated[HTTPBasicCredentials, Depends(docs_basic_auth)],
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     user = await authenticate_user(db, credentials.username.lower(), credentials.password)
     if user is None:

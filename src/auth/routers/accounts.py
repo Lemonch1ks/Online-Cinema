@@ -1,26 +1,25 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-
-from src.auth.models import ActivationToken, User, PasswordResetToken, RefreshToken
+from src.auth.models import ActivationToken, PasswordResetToken, RefreshToken, User
 from src.auth.schemas import EmailRequestSchema, UserNewPasswordSchema
 from src.auth.security import generate_token
 from src.auth.service import (
-    validate_token_by_time,
-    create_and_send_an_activation_link,
     create_and_send_a_password_reset_link,
+    create_and_send_an_activation_link,
+    validate_token_by_time,
 )
 from src.core.config import settings
 from src.core.database import get_db
 from src.notifications.dependencies import get_email_sender
-from src.notifications.emails import EmailSender, BaseEmailError
+from src.notifications.emails import BaseEmailError, EmailSender
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +27,13 @@ router = APIRouter()
 
 
 async def save_new_token(
-        db: AsyncSession,
-        model: type[ActivationToken] | type[PasswordResetToken],
-        user_id: int,
-        token: str,
-        lifetime: timedelta,
+    db: AsyncSession,
+    model: type[ActivationToken] | type[PasswordResetToken],
+    user_id: int,
+    token: str,
+    lifetime: timedelta,
 ) -> None:
-    values = {"token": token, "expires_at": datetime.now(timezone.utc) + lifetime}
+    values = {"token": token, "expires_at": datetime.now(UTC) + lifetime}
     stmt = (
         pg_insert(model)
         .values(user_id=user_id, **values)
@@ -51,15 +50,11 @@ async def save_new_token(
     },
 )
 async def activate_account(
-        token: str,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    token: str,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
-    stmt = (
-        select(ActivationToken)
-        .where(ActivationToken.token == token)
-        .options(selectinload(ActivationToken.user))
-    )
+    stmt = select(ActivationToken).where(ActivationToken.token == token).options(selectinload(ActivationToken.user))
     result = await db.execute(stmt)
     activation_token = result.scalar_one_or_none()
 
@@ -108,9 +103,9 @@ async def activate_account(
     ),
 )
 async def resend_activation_link(
-        data: EmailRequestSchema,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    data: EmailRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
     response = {"detail": "If the account exists and is not activated, a new activation link has been sent."}
 
@@ -142,9 +137,9 @@ async def resend_activation_link(
     status_code=status.HTTP_200_OK,
 )
 async def reset_password_request(
-        email: EmailRequestSchema,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    email: EmailRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ) -> dict[str, str]:
     response = {"detail": "If the account exists a new password reset link has been sent."}
 
@@ -183,8 +178,8 @@ async def reset_password_request(
     },
 )
 async def check_password_reset_token(
-        token: str,
-        db: AsyncSession = Depends(get_db),
+    token: str,
+    db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
     result = await db.execute(select(PasswordResetToken).where(PasswordResetToken.token == token))
     password_reset_token = result.scalar_one_or_none()
@@ -210,9 +205,9 @@ async def check_password_reset_token(
     status_code=status.HTTP_200_OK,
 )
 async def complete_password_reset(
-        data: UserNewPasswordSchema,
-        db: AsyncSession = Depends(get_db),
-        email_sender: EmailSender = Depends(get_email_sender),
+    data: UserNewPasswordSchema,
+    db: AsyncSession = Depends(get_db),
+    email_sender: EmailSender = Depends(get_email_sender),
 ):
     stmt = (
         select(PasswordResetToken)

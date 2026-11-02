@@ -1,5 +1,6 @@
 """Unit tests: no HTTP, no database."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -9,8 +10,8 @@ from src.auth.service import validate_token_by_time
 from src.auth.validators import validate_email, validate_password
 from src.core.config import settings
 
-
 # --- validators ---
+
 
 @pytest.mark.parametrize("password", ["Valid1!pass", "Another$Pass9"])
 def test_validate_password_accepts_strong_password(password):
@@ -43,6 +44,7 @@ def test_validate_email_rejects_invalid_email(email):
 
 
 # --- User model ---
+
 
 def test_user_email_is_lowercased():
     user = User.create(email="Mixed.Case@Example.COM", raw_password="Valid1!pass", group_id=1)
@@ -80,32 +82,34 @@ def test_group_ranks_are_ordered():
 
 # --- token expiry ---
 
+
 @pytest.mark.parametrize(
     ("delta", "expected"),
     [(timedelta(hours=1), True), (timedelta(hours=-1), False)],
 )
 def test_validate_token_by_time(delta, expected):
-    token = ActivationToken(token="t", user_id=1, expires_at=datetime.now(timezone.utc) + delta)
+    token = ActivationToken(token="t", user_id=1, expires_at=datetime.now(UTC) + delta)
 
     assert validate_token_by_time(token) is expected
 
 
 # --- JWT ---
 
+
 def test_access_token_uses_default_lifetime():
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
 
     payload = decode_access_token(create_access_token({"sub": "u@example.com"}))
 
-    expires = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    expires = datetime.fromtimestamp(payload["exp"], tz=UTC)
     assert payload["sub"] == "u@example.com"
     assert abs(expires - (before + settings.ACCESS_TOKEN_LIFETIME)) < timedelta(seconds=5)
 
 
 def test_access_token_uses_custom_lifetime():
-    before = datetime.now(timezone.utc)
+    before = datetime.now(UTC)
 
     payload = decode_access_token(create_access_token({"sub": "u@example.com"}, expires_delta=timedelta(minutes=1)))
 
-    expires = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    expires = datetime.fromtimestamp(payload["exp"], tz=UTC)
     assert abs(expires - (before + timedelta(minutes=1))) < timedelta(seconds=5)

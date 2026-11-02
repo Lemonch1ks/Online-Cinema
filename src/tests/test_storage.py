@@ -1,5 +1,6 @@
 """Unit tests for S3Storage with a fake S3 client (like FakeSMTP for emails): no MinIO needed."""
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -65,7 +66,9 @@ async def test_upload_puts_object_into_bucket(monkeypatch):
 
     await storage.upload("1/abc.png", b"data", content_type="image/png")
 
-    assert client.calls == [("put_object", {"Bucket": "avatars", "Key": "1/abc.png", "Body": b"data", "ContentType": "image/png"})]
+    assert client.calls == [
+        ("put_object", {"Bucket": "avatars", "Key": "1/abc.png", "Body": b"data", "ContentType": "image/png"})
+    ]
     assert created_with == [{"service": "s3", "endpoint_url": "http://minio:9000", "region_name": "us-east-1"}]
 
 
@@ -78,7 +81,7 @@ async def test_delete_removes_object(monkeypatch):
 
 
 async def test_list_objects_reads_all_pages(monkeypatch):
-    t1, t2, t3 = (datetime(2026, 1, day, tzinfo=timezone.utc) for day in (1, 2, 3))
+    t1, t2, t3 = (datetime(2026, 1, day, tzinfo=UTC) for day in (1, 2, 3))
     pages = [
         [{"Key": "1/a.png", "LastModified": t1}, {"Key": "2/b.jpg", "LastModified": t2}],
         [{"Key": "3/c.png", "LastModified": t3}],

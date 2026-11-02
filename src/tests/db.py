@@ -1,9 +1,10 @@
 """Helpers to create, migrate and drop throwaway PostgreSQL databases for tests."""
-from alembic import command
+
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
+from alembic import command
 from src.core.config import BASE_DIR, to_sync_url
 
 

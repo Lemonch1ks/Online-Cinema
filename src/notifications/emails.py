@@ -1,6 +1,6 @@
 import logging
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 import aiosmtplib
 from jinja2 import Environment, FileSystemLoader
@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 class BaseEmailError(Exception):
     """Base class for all exceptions raised by email notification module."""
+
     pass  # noqa: PIE790
 
 
-class EmailSender():  # noqa: UP039
-
+class EmailSender:  # noqa: UP039
     def __init__(
         self,
         hostname: str,
@@ -126,4 +126,3 @@ class EmailSender():  # noqa: UP039
         html_content = template.render(email=email, login_link=login_link)
         subject = self._password_complete_email_subject
         await self._send_email(email, subject, html_content)
-
