@@ -41,9 +41,8 @@ async def register_user(
     if user:
         raise HTTPException(status_code=409, detail="User already exists")
 
-    stmt = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
-    result = await db.execute(stmt)
-    user_group = result.scalars().first()
+    group_stmt = select(UserGroup).where(UserGroup.name == UserGroupEnum.USER)
+    user_group = (await db.execute(group_stmt)).scalars().first()
     if not user_group:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Default user group not found.")
 

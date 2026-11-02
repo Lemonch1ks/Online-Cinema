@@ -134,6 +134,23 @@ ignore = ["B008", "UP037", "UP042"]
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
 
+[tool.mypy]
+python_version = "3.14"
+files = ["src"]
+exclude = ["src/tests/"]
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = true
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["src/tests/*"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 # every test and its fixtures get their own event loop; the test engine uses NullPool because of it

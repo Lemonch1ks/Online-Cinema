@@ -235,8 +235,7 @@ async def complete_password_reset(
 
     try:
         user.password = data.new_password
-        stmt = delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
-        await db.execute(stmt)
+        await db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
         await db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.id))
         await db.commit()
     except SQLAlchemyError as e:

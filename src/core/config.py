@@ -119,4 +119,4 @@ class Settings(BaseSettings):
         return f"{self.FRONTEND_URL.rstrip('/')}/login"
 
 
-settings = Settings()  # type: ignore
+settings = Settings()

@@ -1,10 +1,11 @@
 import asyncio
 from datetime import UTC, datetime
+from typing import cast
 
 from celery import Celery
 from celery.schedules import crontab
 from celery.utils.log import get_task_logger
-from sqlalchemy import delete, select
+from sqlalchemy import CursorResult, delete, select
 
 from src.auth.models import ActivationToken, UserProfile
 from src.core.config import settings
@@ -33,7 +34,7 @@ def delete_expired_activation_tokens() -> int:
     stmt = delete(ActivationToken).where(ActivationToken.expires_at < datetime.now(UTC))
 
     with SyncSessionLocal() as session:
-        result = session.execute(stmt)
+        result = cast(CursorResult, session.execute(stmt))
         session.commit()
 
     logger.info("Deleted %d expired activation tokens", result.rowcount)

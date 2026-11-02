@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
@@ -23,8 +23,10 @@ router = APIRouter()
 
 EXTENSIONS = {"JPEG": "jpg"}
 
-PROFILE_NOT_FOUND = {404: {"description": "You have no profile yet."}}
-UPLOAD_FAILED = {500: {"description": "The avatar could not be uploaded or the profile could not be saved."}}
+PROFILE_NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"description": "You have no profile yet."}}
+UPLOAD_FAILED: dict[int | str, dict[str, Any]] = {
+    500: {"description": "The avatar could not be uploaded or the profile could not be saved."}
+}
 
 
 async def get_profile(db: AsyncSession, user: User, for_update: bool = False) -> UserProfile | None:

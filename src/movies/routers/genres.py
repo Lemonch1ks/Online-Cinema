@@ -24,7 +24,7 @@ async def get_movie_genres(
     stmt = (
         select(Genre, func.count(Movie.id).label("movies_count"))
         .outerjoin(Genre.movies)
-        .group_by(Genre)
+        .group_by(Genre.id)
         .order_by(Genre.id)
     )
 
