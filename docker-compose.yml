@@ -33,6 +33,29 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    # Official MinIO images are no longer published, this is Bitnami's last build of the open-source MinIO.
+    # Pinned tag: the image is frozen and `latest` does not even point to the newest build.
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      # Admin login for the web console and the S3 API (access key / secret key)
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      # name:policy, created on startup if missing; "download" = anyone can read files by URL
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-avatars}:download
+      # Bitnami turns the web console off by default
+      MINIO_BROWSER: "on"
+    volumes:
+      - minio_data:/bitnami/minio/data
+    ports:
+      - "9000:9000"  # S3 API
+      - "9001:9001"  # web console
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   app:
     build: .
     image: main_app
@@ -80,3 +103,4 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:
