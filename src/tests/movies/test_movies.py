@@ -1,6 +1,9 @@
+from decimal import Decimal
+
 import pytest
 
 from src.core.config import settings
+from src.movies.models import Movie
 from src.tests.utils import MOVIES_URL
 
 
@@ -123,6 +126,42 @@ async def test_movies_sorting(client, catalog, params, expected):
     response = await client.get(MOVIES_URL, params=params)
 
     assert names(response) == expected
+
+
+@pytest.fixture()
+async def movie_without_scores(db_session, catalog) -> Movie:
+    matrix = catalog["The Matrix"]
+    movie = Movie(
+        name="Unknown Indie", year=2005, time=90, imdb=7.0, votes=10, meta_score=None, gross=None,
+        description="No box office data.", price=Decimal("1.99"), certification_id=matrix.certification_id,
+    )
+    db_session.add(movie)
+    await db_session.commit()
+    return movie
+
+
+# PostgreSQL puts NULL *first* in DESC and *last* in ASC (it treats NULL as larger than any value).
+# So "highest meta_score first" currently starts with a movie that has no score at all.
+# If that is not wanted, the fix is .nulls_last() in MovieSort.sort, then update these expectations.
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"sort_by": "meta_score", "order_type": "desc"}, ["Unknown Indie", "Inception", "Forrest Gump", "Cast Away", "The Matrix"]),
+        ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception", "Unknown Indie"]),
+        ({"sort_by": "gross", "order_type": "desc"}, ["Unknown Indie", "Forrest Gump", "Inception", "Cast Away", "The Matrix"]),
+    ],
+)
+async def test_movies_sorting_with_null_values(client, movie_without_scores, params, expected):
+    response = await client.get(MOVIES_URL, params=params)
+
+    assert names(response) == expected
+
+
+async def test_movies_range_filter_excludes_null_values(client, movie_without_scores):
+    response = await client.get(MOVIES_URL, params={"meta_score_to": 100})
+
+    assert "Unknown Indie" not in names(response)  # NULL <= 100 is not true in SQL
+    assert response.json()["total_items"] == 4
 
 
 async def test_movies_sorting_applies_before_pagination(client, catalog):

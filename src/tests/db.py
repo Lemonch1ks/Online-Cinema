@@ -37,8 +37,8 @@ def drop_database(url: str) -> None:
     engine.dispose()
 
 
-def alembic(url: str, *commands: tuple[str, str]) -> None:
-    """Run alembic commands, e.g. ("upgrade", "head"), against the given database.
+def alembic(url: str, *commands: tuple[str, ...]) -> None:
+    """Run alembic commands, e.g. ("upgrade", "head") or ("check",), against the given database.
 
     Config is built from pyproject.toml only (no alembic.ini): alembic.ini would run logging.fileConfig,
     which disables already created loggers and breaks pytest's caplog.
@@ -47,6 +47,6 @@ def alembic(url: str, *commands: tuple[str, str]) -> None:
     engine = create_engine(to_sync_url(url))
     with engine.begin() as connection:
         config.attributes["connection"] = connection  # picked up by alembic/env.py
-        for name, revision in commands:
-            getattr(command, name)(config, revision)
+        for name, *args in commands:
+            getattr(command, name)(config, *args)
     engine.dispose()

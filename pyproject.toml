@@ -119,6 +119,8 @@ prepend_sys_path = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# every test and its fixtures get their own event loop; the test engine uses NullPool because of it
+asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["."]
 testpaths = ["src/tests"]
 
