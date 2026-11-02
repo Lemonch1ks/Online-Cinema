@@ -1,5 +1,7 @@
 import logging
 import re
+import struct
+import zlib
 from datetime import date, timedelta
 
 import pytest
@@ -18,6 +20,15 @@ PROFILE_DATA = {
     "date_of_birth": "1995-04-12",
     "info": "Loves sci-fi.",
 }
+
+
+def png_header_only(width: int, height: int) -> bytes:
+    """A tiny PNG that only declares its size: unpacking it would need width * height * 3 bytes of memory."""
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IEND", b"")
 
 
 def avatar_file(data: bytes | None = None, filename: str = "avatar.png", content_type: str = "image/png") -> dict:
@@ -129,6 +140,24 @@ async def test_create_profile_with_invalid_avatar_returns_422(client, db_session
 
     assert response.status_code == 422
     assert message in response.json()["detail"]
+    assert storage.files == {}
+    assert await get_db_profile(db_session, active_user.id) is None
+
+
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [(20_000, 20_000), (10_000, 10_000)],
+    ids=["above-pillow-error-limit", "above-pillow-warning-limit"],
+)
+async def test_create_profile_with_decompression_bomb_returns_422(
+    client, db_session, active_user, auth_headers, storage, width, height
+):
+    bomb = png_header_only(width, height)
+    assert len(bomb) < 100
+
+    response = await create_profile(client, auth_headers, files=avatar_file(bomb))
+
+    assert response.status_code == 422
     assert storage.files == {}
     assert await get_db_profile(db_session, active_user.id) is None
 

@@ -1,9 +1,10 @@
 import re
+import warnings
 from datetime import date
 from io import BytesIO
 
 import email_validator
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 from src.core.config import settings
 
@@ -61,10 +62,12 @@ def validate_avatar(data: bytes) -> str:
     if len(data) > settings.AVATAR_MAX_SIZE:
         raise ValueError(f"Avatar must not be larger than {settings.AVATAR_MAX_SIZE // 1024} KB.")
     try:
-        with Image.open(BytesIO(data)) as image:
-            image_format = image.format
-            image.verify()
-    except (UnidentifiedImageError, OSError, SyntaxError) as error:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(data)) as image:
+                image_format = image.format
+                image.verify()
+    except Exception as error:
         raise ValueError("Avatar is not a valid image.") from error
     if image_format not in settings.AVATAR_FORMATS:
         raise ValueError(f"Unsupported avatar format {image_format}, use one of: {', '.join(settings.AVATAR_FORMATS)}.")
