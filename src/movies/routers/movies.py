@@ -36,16 +36,6 @@ router = APIRouter()
             "The response includes details about the movies, total pages, and total items, "
             "along with links to the previous and next pages if applicable.</h3>"
     ),
-    responses={
-        404: {
-            "description": "No movies found.",
-            "content": {
-                "application/json": {
-                    "example": {"detail": "No movies found."}
-                }
-            },
-        }
-    }
 )
 async def get_movies(
         request: Request,
@@ -67,16 +57,10 @@ async def get_movies(
     result_count = await db.execute(count_stmt)
     total_items = result_count.scalar() or 0
 
-    if not total_items:
-        raise HTTPException(status_code=404, detail="No movies found.")
-
     stmt = query_params.sort(stmt)
 
     items = await db.execute(stmt.order_by(Movie.id).offset(offset).limit(per_page))
     movies = items.scalars().all()
-
-    if not movies:
-        raise HTTPException(status_code=404, detail="No movies found.")
 
     total_pages = (total_items + per_page - 1) // per_page
 

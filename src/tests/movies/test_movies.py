@@ -13,10 +13,14 @@ def names(response) -> list[str]:
 
 # --- GET /movies: list and pagination ---
 
-async def test_movies_list_on_empty_db_returns_404(client):
+EMPTY_PAGE = {"movies": [], "total_items": 0, "total_pages": 0, "prev_page": None, "next_page": None}
+
+
+async def test_movies_list_on_empty_db_returns_empty_page(client):
     response = await client.get(MOVIES_URL)
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
 
 
 async def test_movies_list_returns_all_movies_ordered_by_id(client, catalog):
@@ -52,10 +56,17 @@ async def test_movies_page_links_keep_filters(client, catalog):
     assert response.json()["next_page"] == f"{MOVIES_URL}?year_from=1990&page=2&per_page=1"
 
 
-async def test_movies_page_out_of_range_returns_404(client, catalog):
+async def test_movies_page_out_of_range_returns_empty_page(client, catalog):
     response = await client.get(MOVIES_URL, params={"page": 3, "per_page": 2})
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == {
+        "movies": [],
+        "total_items": 4,
+        "total_pages": 2,
+        "prev_page": f"{MOVIES_URL}?page=2&per_page=2",
+        "next_page": None,
+    }
 
 
 @pytest.mark.parametrize(
@@ -114,10 +125,11 @@ async def test_movies_filter_with_equal_bounds(client, catalog):
     assert names(response) == ["The Matrix"]
 
 
-async def test_movies_filter_without_matches_returns_404(client, catalog):
+async def test_movies_filter_without_matches_returns_empty_page(client, catalog):
     response = await client.get(MOVIES_URL, params={"year_from": 2020})
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
 
 
 # --- sorting ---
@@ -199,10 +211,11 @@ async def test_movies_search(client, catalog, search, expected):
     assert names(response) == expected
 
 
-async def test_movies_search_without_matches_returns_404(client, catalog):
+async def test_movies_search_without_matches_returns_empty_page(client, catalog):
     response = await client.get(MOVIES_URL, params={"search_param": "star wars"})
 
-    assert response.status_code == 404
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
 
 
 async def test_movies_search_filter_and_sort_combined(client, catalog):
