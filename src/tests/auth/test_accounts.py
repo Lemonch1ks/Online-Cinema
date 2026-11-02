@@ -1,4 +1,5 @@
 from urllib.parse import urlsplit
+import asyncio
 
 import pytest
 from sqlalchemy import select
@@ -296,3 +297,20 @@ async def test_forgot_password_full_flow(client, email_sender, active_user):
     assert check.status_code == 200
     assert complete.status_code == 200
     assert login.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("url", "user_is_active", "get_token"),
+    [
+        (ACTIVATION_RESEND_URL, False, get_activation_token),
+        (PASSWORD_RESET_REQUEST_URL, True, get_password_reset_token),
+    ],
+    ids=["resend-activation", "password-reset-request"],
+)
+async def test_concurrent_token_requests_both_succeed_with_one_token(client, db_session, url, user_is_active, get_token):
+    user = await create_user(db_session, is_active=user_is_active)
+
+    responses = await asyncio.gather(*(client.post(url, json={"email": TEST_EMAIL}) for _ in range(2)))
+
+    assert [r.status_code for r in responses] == [200, 200]
+    assert await get_token(db_session, user.id) is not None

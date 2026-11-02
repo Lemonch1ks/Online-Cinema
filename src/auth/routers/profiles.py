@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from PIL import Image
 from sqlalchemy import select
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.dependencies import get_current_active_user
@@ -94,6 +94,11 @@ async def create_profile(
     db.add(profile)
     try:
         await db.commit()
+    except IntegrityError as error:
+        await db.rollback()
+        if avatar_key:
+            await delete_avatar_quietly(storage, avatar_key)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="You already have a profile.") from error
     except SQLAlchemyError as error:
         await db.rollback()
         if avatar_key:

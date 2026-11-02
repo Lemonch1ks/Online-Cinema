@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import re
 import struct
 import zlib
@@ -320,3 +321,13 @@ async def test_profile_endpoints_require_auth(client, method):
     response = await client.request(method.upper(), PROFILE_URL)
 
     assert response.status_code == 401
+
+
+async def test_concurrent_profile_creation_returns_409_and_keeps_one_avatar(
+    client, db_session, active_user, auth_headers, storage
+):
+    responses = await asyncio.gather(*(create_profile(client, auth_headers, files=avatar_file()) for _ in range(2)))
+
+    assert sorted(r.status_code for r in responses) == [201, 409]
+    profile = await get_db_profile(db_session, active_user.id)
+    assert list(storage.files) == [profile.avatar]

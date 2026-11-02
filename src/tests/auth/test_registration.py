@@ -1,4 +1,6 @@
 import pytest
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -79,3 +81,13 @@ async def test_register_invalid_payload_returns_422(client, payload):
     response = await client.post(REGISTER_URL, json=payload)
 
     assert response.status_code == 422
+
+
+async def test_concurrent_registration_with_same_email_returns_409(client, db_session, email_sender):
+    payload = {"email": "race@example.com", "password": VALID_PASSWORD}
+
+    responses = await asyncio.gather(*(client.post(REGISTER_URL, json=payload) for _ in range(2)))
+
+    assert sorted(r.status_code for r in responses) == [201, 409]
+    users = (await db_session.execute(select(User).where(User.email == "race@example.com"))).scalars().all()
+    assert len(users) == 1
