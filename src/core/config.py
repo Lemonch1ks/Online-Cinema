@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     DB_PATH: Path = BASE_DIR / "cinema.db"
     DB_ECHO: bool = False
 
+    #--- Celery ---
+
+    BROKER_URL: str = "redis://localhost:6379"
+
     # --- Auth: JWT and tokens ---
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
