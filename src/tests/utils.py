@@ -30,6 +30,8 @@ ADMIN_USERS_URL = f"{settings.API_VERSION_PREFIX}/admins/users"
 
 MOVIES_URL = f"{settings.API_VERSION_PREFIX}/movies"
 GENRES_URL = f"{settings.API_VERSION_PREFIX}/genres"
+STARS_URL = f"{settings.API_VERSION_PREFIX}/stars"
+DIRECTORS_URL = f"{settings.API_VERSION_PREFIX}/directors"
 PROFILE_URL = f"{settings.API_VERSION_PREFIX}/profiles/me"
 
 
@@ -63,6 +65,12 @@ async def login(client: AsyncClient, email: str = TEST_EMAIL, password: str = TE
 
 def bearer(access_token: str) -> dict:
     return {"Authorization": f"Bearer {access_token}"}
+
+
+async def headers_for(client: AsyncClient, db: AsyncSession, group: UserGroupEnum, email: str) -> dict:
+    """Creates a user in the group, logs in and returns the Authorization header."""
+    await create_user_in_group(db, email, group)
+    return bearer((await login(client, email))["access_token"])
 
 
 def _expires_at(lifetime: timedelta, expired: bool) -> datetime:

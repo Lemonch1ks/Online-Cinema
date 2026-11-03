@@ -2,13 +2,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.auth.dependencies import require_role
-from src.auth.models import UserGroupEnum
 from src.core.database import get_db
+from src.movies.dependencies import need_moderator
 from src.movies.filters import MoviesQuery
 from src.movies.models import Certification, Director, Genre, Movie, Star
 from src.movies.schemas import (
@@ -18,11 +16,9 @@ from src.movies.schemas import (
     MovieListResponseSchema,
     MovieUpdateSchema,
 )
-from src.movies.service import get_or_create_by_names
+from src.movies.service import commit_or_409, get_or_create_by_names
 
 router = APIRouter()
-
-need_moderator = Depends(require_role(UserGroupEnum.MODERATOR))
 
 DUPLICATE_MOVIE_DETAIL = "A movie with this name, year and time already exists."
 
@@ -107,13 +103,6 @@ async def get_movie_or_404(db: AsyncSession, movie_id: int) -> Movie:
     return movie
 
 
-async def commit_or_409(db: AsyncSession) -> None:
-    try:
-        await db.commit()
-    except IntegrityError as error:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=DUPLICATE_MOVIE_DETAIL) from error
-
-
 @router.get(
     "/{movie_id}",
     response_model=MovieDetailItemSchema,
@@ -154,7 +143,7 @@ async def create_movie(
         directors=await get_or_create_by_names(db, Director, new_data.directors),
     )
     db.add(movie)
-    await commit_or_409(db)
+    await commit_or_409(db, DUPLICATE_MOVIE_DETAIL)
 
     return MovieDetailItemSchema.model_validate(movie)
 
@@ -186,7 +175,7 @@ async def update_movie(
 
     for field, value in changes.items():
         setattr(movie, field, value)
-    await commit_or_409(db)
+    await commit_or_409(db, DUPLICATE_MOVIE_DETAIL)
 
     return MovieDetailItemSchema.model_validate(movie)
 
