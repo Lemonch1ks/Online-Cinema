@@ -1,7 +1,8 @@
 from decimal import Decimal
+from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
 
 
 class SideSchema(BaseModel):
@@ -63,6 +64,69 @@ class MovieDetailItemSchema(MovieBaseSchema):
     genres: list[GenreSchema]
     directors: list[DirectorSchema]
     stars: list[StarSchema]
+
+
+def unique_names(names: list[str]) -> list[str]:
+    unique: dict[str, str] = {}
+    for name in names:
+        unique.setdefault(name.lower(), name)
+    return list(unique.values())
+
+
+Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+Names = Annotated[list[Name], AfterValidator(unique_names)]
+Year = Annotated[int, Field(ge=1800, le=2100)]
+Minutes = Annotated[int, Field(gt=0)]
+Imdb = Annotated[float, Field(ge=0, le=10)]
+Votes = Annotated[int, Field(ge=0)]
+MetaScore = Annotated[float, Field(ge=0, le=100)]
+Gross = Annotated[float, Field(ge=0)]
+Price = Annotated[Decimal, Field(ge=0, max_digits=10, decimal_places=2)]
+Description = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class MovieCreationSchema(BaseModel):
+    name: Name
+    year: Year
+    time: Minutes
+    imdb: Imdb
+    votes: Votes
+    meta_score: MetaScore | None = None
+    gross: Gross | None = None
+    price: Price
+    description: Description
+    certification: Name
+    genres: Names = []
+    stars: Names = []
+    directors: Names = []
+
+    model_config = {"extra": "forbid"}
+
+
+class MovieUpdateSchema(BaseModel):
+    name: Name | None = None
+    year: Year | None = None
+    time: Minutes | None = None
+    imdb: Imdb | None = None
+    votes: Votes | None = None
+    meta_score: MetaScore | None = None
+    gross: Gross | None = None
+    price: Price | None = None
+    description: Description | None = None
+    certification: Name | None = None
+    genres: Names | None = None
+    stars: Names | None = None
+    directors: Names | None = None
+
+    model_config = {"extra": "forbid"}
+
+    @model_validator(mode="after")
+    def forbid_null_for_required_fields(self) -> Self:
+        nullable = {"meta_score", "gross"}
+        nulls = sorted(name for name in self.model_fields_set - nullable if getattr(self, name) is None)
+        if nulls:
+            raise ValueError(f"Fields cannot be null: {', '.join(nulls)}")
+        return self
 
 
 class GenreItemSchema(BaseModel):
