@@ -16,6 +16,8 @@ METHODS = {
     "send_activation_complete_email": "activation_complete",
     "send_password_reset_email": "password_reset",
     "send_password_reset_complete_email": "password_reset_complete",
+    "send_comment_reply_email": "comment_reply",
+    "send_comment_like_email": "comment_like",
 }
 
 
@@ -140,22 +142,30 @@ def test_smtp_sender_is_built_from_settings_and_cached():
         sender._activation_complete_email_template_name,
         sender._password_email_template_name,
         sender._password_complete_email_template_name,
+        sender._comment_reply_email_template_name,
+        sender._comment_like_email_template_name,
     ) == (
         settings.ACTIVATION_REQUEST_TEMPLATE_NAME,
         settings.ACTIVATION_COMPLETE_TEMPLATE_NAME,
         settings.PASSWORD_RESET_REQUEST_TEMPLATE_NAME,
         settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
+        settings.COMMENT_REPLY_TEMPLATE_NAME,
+        settings.COMMENT_LIKE_TEMPLATE_NAME,
     )
     assert (
         sender._activation_email_subject,
         sender._activation_complete_email_subject,
         sender._password_email_subject,
         sender._password_complete_email_subject,
+        sender._comment_reply_email_subject,
+        sender._comment_like_email_subject,
     ) == (
         settings.ACTIVATION_REQUEST_SUBJECT,
         settings.ACTIVATION_COMPLETE_SUBJECT,
         settings.PASSWORD_RESET_REQUEST_SUBJECT,
         settings.PASSWORD_RESET_COMPLETE_SUBJECT,
+        settings.COMMENT_REPLY_SUBJECT,
+        settings.COMMENT_LIKE_SUBJECT,
     )
     assert email_tasks.get_smtp_sender() is sender
 

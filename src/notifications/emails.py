@@ -31,6 +31,10 @@ class EmailSender:  # noqa: UP039
         activation_complete_email_subject: str,
         password_email_subject: str,
         password_complete_email_subject: str,
+        comment_reply_email_template_name: str,
+        comment_like_email_template_name: str,
+        comment_reply_email_subject: str,
+        comment_like_email_subject: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -45,6 +49,10 @@ class EmailSender:  # noqa: UP039
         self._activation_complete_email_subject = activation_complete_email_subject
         self._password_email_subject = password_email_subject
         self._password_complete_email_subject = password_complete_email_subject
+        self._comment_reply_email_template_name = comment_reply_email_template_name
+        self._comment_like_email_template_name = comment_like_email_template_name
+        self._comment_reply_email_subject = comment_reply_email_subject
+        self._comment_like_email_subject = comment_like_email_subject
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
 
@@ -126,3 +134,15 @@ class EmailSender:  # noqa: UP039
         html_content = template.render(email=email, login_link=login_link)
         subject = self._password_complete_email_subject
         await self._send_email(email, subject, html_content)
+
+    async def send_comment_reply_email(self, email: str, comment_link: str) -> None:
+        """Tell the author of a comment that somebody replied to it."""
+        template = self._env.get_template(self._comment_reply_email_template_name)
+        html_content = template.render(email=email, comment_link=comment_link)
+        await self._send_email(email, self._comment_reply_email_subject, html_content)
+
+    async def send_comment_like_email(self, email: str, comment_link: str) -> None:
+        """Tell the author of a comment that somebody liked it."""
+        template = self._env.get_template(self._comment_like_email_template_name)
+        html_content = template.render(email=email, comment_link=comment_link)
+        await self._send_email(email, self._comment_like_email_subject, html_content)

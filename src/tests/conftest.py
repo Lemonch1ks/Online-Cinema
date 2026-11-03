@@ -69,6 +69,8 @@ class FakeEmailSender:
         self.activation_complete_emails: list[tuple[str, str]] = []
         self.password_reset_emails: list[tuple[str, str]] = []
         self.password_reset_complete_emails: list[tuple[str, str]] = []
+        self.comment_reply_emails: list[tuple[str, str]] = []
+        self.comment_like_emails: list[tuple[str, str]] = []
 
     async def send_activation_email(self, email: str, activation_link: str) -> None:
         self.activation_emails.append((email, activation_link))
@@ -81,6 +83,12 @@ class FakeEmailSender:
 
     async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
         self.password_reset_complete_emails.append((email, login_link))
+
+    async def send_comment_reply_email(self, email: str, comment_link: str) -> None:
+        self.comment_reply_emails.append((email, comment_link))
+
+    async def send_comment_like_email(self, email: str, comment_link: str) -> None:
+        self.comment_like_emails.append((email, comment_link))
 
 
 @pytest.fixture()

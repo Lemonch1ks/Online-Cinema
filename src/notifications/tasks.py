@@ -10,6 +10,8 @@ EMAIL_METHODS = {
     "activation_complete": "send_activation_complete_email",
     "password_reset": "send_password_reset_email",
     "password_reset_complete": "send_password_reset_complete_email",
+    "comment_reply": "send_comment_reply_email",
+    "comment_like": "send_comment_like_email",
 }
 
 
@@ -30,6 +32,10 @@ def get_smtp_sender() -> EmailSender:
         activation_complete_email_subject=settings.ACTIVATION_COMPLETE_SUBJECT,
         password_email_subject=settings.PASSWORD_RESET_REQUEST_SUBJECT,
         password_complete_email_subject=settings.PASSWORD_RESET_COMPLETE_SUBJECT,
+        comment_reply_email_template_name=settings.COMMENT_REPLY_TEMPLATE_NAME,
+        comment_like_email_template_name=settings.COMMENT_LIKE_TEMPLATE_NAME,
+        comment_reply_email_subject=settings.COMMENT_REPLY_SUBJECT,
+        comment_like_email_subject=settings.COMMENT_LIKE_SUBJECT,
     )
 
 

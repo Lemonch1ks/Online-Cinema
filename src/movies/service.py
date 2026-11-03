@@ -1,10 +1,13 @@
-from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from fastapi import HTTPException, Request, status
+from sqlalchemy import Select, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.movies.models import Certification, Director, Genre, Movie, Star
+from src.core.config import settings
+from src.movies.filters import MoviesQuery
+from src.movies.models import Certification, Director, Genre, Movie, MovieRating, MovieReaction, Star
+from src.movies.schemas import MovieDetailItemSchema, MovieListItemSchema, MovieListResponseSchema
 
 
 async def get_or_create_by_names[T: (Genre, Star, Director, Certification)](
@@ -61,3 +64,64 @@ def duplicate_name_detail(label: str, name: str) -> str:
 async def count_movies[T: (Genre, Star, Director)](db: AsyncSession, model: type[T], record_id: int) -> int:
     stmt = select(func.count(Movie.id)).join(model.movies).where(model.id == record_id)
     return (await db.execute(stmt)).scalar_one()
+
+
+async def get_movies_page(
+    db: AsyncSession, request: Request, stmt: Select, query: MoviesQuery
+) -> MovieListResponseSchema:
+    """One page of a movie catalog: search, filters, sorting and pagination on top of `stmt`.
+
+    `stmt` selects the movies to start from: the whole catalog or, for example, a user's favorites.
+    """
+    page, per_page = query.page, query.per_page
+    stmt = query.filter(query.search(stmt))
+
+    total_items = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+    total_pages = (total_items + per_page - 1) // per_page
+
+    stmt = query.sort(stmt).order_by(Movie.id).offset((page - 1) * per_page).limit(per_page)
+    movies = [MovieListItemSchema.model_validate(movie) for movie in await db.scalars(stmt)]
+
+    def page_link(page_number: int) -> str:
+        url = request.url.include_query_params(page=page_number, per_page=per_page)
+        return f"{url.path}?{url.query}"
+
+    return MovieListResponseSchema(
+        movies=movies,
+        prev_page=page_link(page - 1) if page > 1 else None,
+        next_page=page_link(page + 1) if page < total_pages else None,
+        total_pages=total_pages,
+        total_items=total_items,
+    )
+
+
+async def ensure_movie_exists(db: AsyncSession, movie_id: int) -> None:
+    if await db.scalar(select(Movie.id).where(Movie.id == movie_id)) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No movies with id:{movie_id} found.")
+
+
+async def movie_details(db: AsyncSession, movie: Movie) -> MovieDetailItemSchema:
+    """Movie details with likes, dislikes and the average rating of our users."""
+    likes, dislikes = (
+        await db.execute(
+            select(
+                func.count().filter(MovieReaction.is_like.is_(True)),
+                func.count().filter(MovieReaction.is_like.is_(False)),
+            ).where(MovieReaction.movie_id == movie.id)
+        )
+    ).one()
+    rating_avg, rating_count = (
+        await db.execute(select(func.avg(MovieRating.score), func.count()).where(MovieRating.movie_id == movie.id))
+    ).one()
+    return MovieDetailItemSchema.model_validate(movie).model_copy(
+        update={
+            "likes": likes,
+            "dislikes": dislikes,
+            "rating_avg": None if rating_avg is None else round(float(rating_avg), 2),
+            "rating_count": rating_count,
+        }
+    )
+
+
+def comment_link(movie_id: int, comment_id: int) -> str:
+    return f"{settings.FRONTEND_URL.rstrip('/')}/movies/{movie_id}#comment-{comment_id}"
