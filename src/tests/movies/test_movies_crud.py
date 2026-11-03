@@ -14,9 +14,7 @@ from src.movies.models import (
     movie_genres_table,
     movie_stars_table,
 )
-from src.tests.utils import MOVIES_URL, bearer, create_user_in_group, login
-
-MODERATOR_EMAIL = "moderator@example.com"
+from src.tests.utils import MOVIES_URL, headers_for
 
 NEW_MOVIE = {
     "name": "Interstellar",
@@ -37,16 +35,6 @@ NEW_MOVIE = {
 
 def movie_url(movie_id: int) -> str:
     return f"{MOVIES_URL}/{movie_id}"
-
-
-async def headers_for(client, db_session, group: UserGroupEnum, email: str = MODERATOR_EMAIL) -> dict:
-    await create_user_in_group(db_session, email, group)
-    return bearer((await login(client, email))["access_token"])
-
-
-@pytest.fixture()
-async def moderator_headers(client, db_session) -> dict:
-    return await headers_for(client, db_session, UserGroupEnum.MODERATOR)
 
 
 async def count(db_session, model) -> int:
@@ -120,7 +108,7 @@ async def test_regular_user_gets_403(client, db_session, catalog):
 
 @pytest.mark.parametrize("group", [UserGroupEnum.MODERATOR, UserGroupEnum.ADMIN])
 async def test_moderator_and_admin_can_create_movie(client, db_session, group):
-    headers = await headers_for(client, db_session, group)
+    headers = await headers_for(client, db_session, group, "moderator@example.com")
 
     response = await client.post(MOVIES_URL, json=NEW_MOVIE, headers=headers)
 

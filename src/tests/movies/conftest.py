@@ -2,7 +2,9 @@ from decimal import Decimal
 
 import pytest
 
+from src.auth.models import UserGroupEnum
 from src.movies.models import Certification, Director, Genre, Movie, Star
+from src.tests.utils import headers_for
 
 MOVIES = [
     {
@@ -83,3 +85,8 @@ async def catalog(db_session) -> dict[str, Movie]:
     db_session.add_all(genres.values())
     await db_session.commit()
     return movies
+
+
+@pytest.fixture()
+async def moderator_headers(client, db_session) -> dict:
+    return await headers_for(client, db_session, UserGroupEnum.MODERATOR, "moderator@example.com")

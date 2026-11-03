@@ -71,11 +71,15 @@ class Star(Base):
     __tablename__ = "stars"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    movies: Mapped[list["Movie"]] = relationship(secondary=movie_stars_table, back_populates="stars")
+    movies: Mapped[list["Movie"]] = relationship(
+        secondary=movie_stars_table, back_populates="stars", order_by="Movie.id"
+    )
 
 
 class Director(Base):
     __tablename__ = "directors"
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
-    movies: Mapped[list["Movie"]] = relationship(secondary=movie_directors_table, back_populates="directors")
+    movies: Mapped[list["Movie"]] = relationship(
+        secondary=movie_directors_table, back_populates="directors", order_by="Movie.id"
+    )

@@ -145,3 +145,38 @@ class GenreDetailItemSchema(BaseModel):
     movies: list[MovieListItemSchema]
 
     model_config = {"from_attributes": True}
+
+
+class NameInSchema(BaseModel):
+    name: Name
+
+    model_config = {"extra": "forbid"}
+
+
+class NamedItemSchema(BaseModel):
+    id: int
+    name: str
+    movies_count: int
+
+
+class PageSchema(BaseModel):
+    next_page: str | None
+    prev_page: str | None
+    total_pages: int
+    total_items: int
+
+
+class StarListResponseSchema(PageSchema):
+    stars: list[NamedItemSchema]
+
+
+class DirectorListResponseSchema(PageSchema):
+    directors: list[NamedItemSchema]
+
+
+class StarDetailSchema(GenreDetailItemSchema):
+    pass
+
+
+class DirectorDetailSchema(GenreDetailItemSchema):
+    pass
