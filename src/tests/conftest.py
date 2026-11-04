@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncGenerator, Generator
 
 import pytest
@@ -14,7 +15,14 @@ from src.core.database import Base, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
 from src.payments.dependencies import get_payment_gateway
-from src.payments.gateway import CheckoutItem, CheckoutSession, PaymentGatewayError
+from src.payments.gateway import (
+    CheckoutItem,
+    CheckoutSession,
+    InvalidWebhookError,
+    PaymentGatewayError,
+    WebhookEvent,
+    read_event,
+)
 from src.storage.dependencies import get_storage
 from src.storage.s3 import StorageError
 from src.tests.db import alembic, create_database, drop_database, with_database
@@ -73,6 +81,9 @@ class FakeEmailSender:
         self.password_reset_complete_emails: list[tuple[str, str]] = []
         self.comment_reply_emails: list[tuple[str, str]] = []
         self.comment_like_emails: list[tuple[str, str]] = []
+        self.payment_success_emails: list[tuple[str, str]] = []
+        self.payment_failed_emails: list[tuple[str, str]] = []
+        self.refund_emails: list[tuple[str, str]] = []
 
     async def send_activation_email(self, email: str, activation_link: str) -> None:
         self.activation_emails.append((email, activation_link))
@@ -91,6 +102,15 @@ class FakeEmailSender:
 
     async def send_comment_like_email(self, email: str, comment_link: str) -> None:
         self.comment_like_emails.append((email, comment_link))
+
+    async def send_payment_success_email(self, email: str, purchases_link: str) -> None:
+        self.payment_success_emails.append((email, purchases_link))
+
+    async def send_payment_failed_email(self, email: str, orders_link: str) -> None:
+        self.payment_failed_emails.append((email, orders_link))
+
+    async def send_refund_email(self, email: str, orders_link: str) -> None:
+        self.refund_emails.append((email, orders_link))
 
 
 @pytest.fixture()
@@ -126,19 +146,57 @@ def storage() -> FakeStorage:
 
 
 class FakePaymentGateway:
-    """In-memory replacement of StripeGateway. Set fail to simulate a Stripe outage or rejection."""
+    """In-memory replacement of StripeGateway. Set fail to simulate a Stripe outage or rejection.
+
+    Webhook bodies are Stripe event JSON; only FakePaymentGateway.SIGNATURE passes the signature check.
+    statuses keeps each payment page status like Stripe does: "open", "complete" or "expired".
+    """
+
+    SIGNATURE = "t=1,v1=valid-fake-signature"
 
     def __init__(self) -> None:
         self.sessions: list[tuple[int, list[CheckoutItem], CheckoutSession]] = []
+        self.statuses: dict[str, str] = {}
+        self.refunds: list[str] = []
         self.fail = False
 
-    async def create_checkout_session(self, order_id: int, items: list[CheckoutItem]) -> CheckoutSession:
+    def _check_available(self) -> None:
         if self.fail:
             raise PaymentGatewayError("stripe is down")
+
+    async def create_checkout_session(self, order_id: int, items: list[CheckoutItem]) -> CheckoutSession:
+        self._check_available()
         session_id = f"cs_test_fake_{len(self.sessions) + 1}"
         session = CheckoutSession(id=session_id, url=f"https://checkout.stripe.test/c/pay/{session_id}")
         self.sessions.append((order_id, list(items), session))
+        self.statuses[session_id] = "open"
         return session
+
+    async def get_checkout_status(self, session_id: str) -> str:
+        self._check_available()
+        if session_id not in self.statuses:
+            raise PaymentGatewayError(f"No such checkout.session: {session_id}")
+        return self.statuses[session_id]
+
+    async def close_checkout_session(self, session_id: str) -> str:
+        if await self.get_checkout_status(session_id) == "open":
+            self.statuses[session_id] = "expired"
+        return self.statuses[session_id]
+
+    async def refund(self, payment_intent: str) -> None:
+        self._check_available()
+        if payment_intent in self.refunds:
+            raise PaymentGatewayError(f"Charge for {payment_intent} has already been refunded.")
+        self.refunds.append(payment_intent)
+
+    def parse_event(self, payload: bytes, signature: str | None) -> WebhookEvent:
+        if signature != self.SIGNATURE:
+            raise InvalidWebhookError("No signatures found matching the expected signature for payload")
+        try:
+            event = json.loads(payload)
+            return read_event(event["type"], event["data"]["object"])
+        except (ValueError, KeyError, TypeError) as e:
+            raise InvalidWebhookError(str(e)) from e
 
 
 @pytest.fixture()

@@ -11,6 +11,7 @@ from src.core.config import settings
 from src.movies.models import Movie
 from src.orders.models import Order, OrderItem, OrderStatusEnum
 from src.payments.gateway import CheckoutItem
+from src.payments.models import Payment, PaymentStatusEnum
 from src.tests.utils import MOVIES_URL, headers_for
 
 ORDERS_URL = f"{settings.API_VERSION_PREFIX}/orders"
@@ -49,6 +50,10 @@ def movie_names(order: dict) -> list[str]:
     return [item["name"] for item in order["items"]]
 
 
+async def order_status(db_session, order_id: int) -> OrderStatusEnum:
+    return (await db_session.get(Order, order_id, populate_existing=True)).status
+
+
 @pytest.fixture()
 async def admin_headers(client, db_session) -> dict:
     return await headers_for(client, db_session, UserGroupEnum.ADMIN, "admin@example.com")
@@ -64,9 +69,10 @@ async def test_anonymous_gets_401(client):
         await client.post(f"{ORDERS_URL}/1/cancel"),
         await client.get(ADMIN_ORDERS_URL),
         await client.post(f"{ORDERS_URL}/1/pay"),
+        await client.post(f"{ORDERS_URL}/1/refund"),
     ]
 
-    assert [response.status_code for response in responses] == [401] * 5
+    assert [response.status_code for response in responses] == [401] * 6
 
 
 # --- place an order ---
@@ -255,6 +261,43 @@ async def test_cancel_order_that_is_not_pending_gives_409(client, db_session, ca
     assert (await db_session.get(Order, order["id"], populate_existing=True)).status == status
 
 
+async def test_cancel_closes_the_open_payment_page(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+    [(_, _, session)] = payment_gateway.sessions
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/cancel", headers=alice.headers)
+
+    assert response.status_code == 200
+    assert payment_gateway.statuses[session.id] == "expired"
+
+
+async def test_cancel_after_the_page_was_paid_gives_409(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+    [(_, _, session)] = payment_gateway.sessions
+    payment_gateway.statuses[session.id] = "complete"
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/cancel", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "The order has just been paid, the payment is being confirmed. Request a refund instead."
+    )
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
+
+
+async def test_cancel_when_stripe_fails_gives_502(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+    payment_gateway.fail = True
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/cancel", headers=alice.headers)
+
+    assert response.status_code == 502
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
+
+
 async def test_cancel_other_users_order_gives_404(client, db_session, catalog, alice, bob):
     order = await place_order(client, bob, catalog["The Matrix"])
 
@@ -274,10 +317,6 @@ async def test_cancel_unknown_order_gives_404(client, alice):
 # --- pay ---
 
 
-async def order_status(db_session, order_id: int) -> OrderStatusEnum:
-    return (await db_session.get(Order, order_id, populate_existing=True)).status
-
-
 async def test_pay_opens_a_checkout_page_with_every_movie_of_the_order(
     client, db_session, catalog, alice, payment_gateway
 ):
@@ -294,18 +333,67 @@ async def test_pay_opens_a_checkout_page_with_every_movie_of_the_order(
     assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
 
 
-async def test_pay_charges_the_price_at_order_not_the_current_price(
+async def test_pay_after_a_price_change_updates_the_order_and_asks_to_confirm(
     client, db_session, catalog, alice, payment_gateway
 ):
-    matrix = catalog["The Matrix"]
-    order = await place_order(client, alice, matrix)
+    matrix, inception = catalog["The Matrix"], catalog["Inception"]
+    order = await place_order(client, alice, matrix, inception)
     await db_session.execute(update(Movie).where(Movie.id == matrix.id).values(price=Decimal("19.99")))
     await db_session.commit()
 
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "Prices have changed since the order was placed. New total: 27.48. Pay again to confirm."
+    )
+    assert payment_gateway.sessions == []
+    saved = await db_session.get(Order, order["id"], populate_existing=True)
+    assert saved.total_amount == Decimal("27.48")
+    prices = dict((await db_session.execute(select(OrderItem.movie_id, OrderItem.price_at_order))).all())
+    assert prices == {matrix.id: Decimal("19.99"), inception.id: Decimal("7.49")}
+
+    confirmed = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert confirmed.status_code == 200
+    [(_, items, _)] = payment_gateway.sessions
+    assert items == [CheckoutItem("The Matrix", Decimal("19.99")), CheckoutItem("Inception", Decimal("7.49"))]
+
+
+async def test_pay_saves_the_payment_page_of_the_order(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+
     await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
 
-    [(_, items, _)] = payment_gateway.sessions
-    assert items == [CheckoutItem("The Matrix", Decimal("9.99"))]
+    [(_, _, session)] = payment_gateway.sessions
+    saved = await db_session.get(Order, order["id"], populate_existing=True)
+    assert saved.checkout_session_id == session.id
+
+
+async def test_pay_again_closes_the_previous_payment_page(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 200
+    first, second = (session.id for _, _, session in payment_gateway.sessions)
+    assert payment_gateway.statuses == {first: "expired", second: "open"}
+    saved = await db_session.get(Order, order["id"], populate_existing=True)
+    assert saved.checkout_session_id == second
+
+
+async def test_pay_when_the_previous_page_was_just_paid_gives_409(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+    [(_, _, session)] = payment_gateway.sessions
+    payment_gateway.statuses[session.id] = "complete"  # paid, the webhook has not arrived yet
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "The order has just been paid, the payment is being confirmed."
+    assert len(payment_gateway.sessions) == 1
 
 
 @pytest.mark.parametrize("status", [OrderStatusEnum.paid, OrderStatusEnum.canceled])
@@ -348,6 +436,100 @@ async def test_pay_when_stripe_fails_gives_502_and_order_stays_pending(
     assert response.status_code == 502
     assert response.json()["detail"] == "Payment provider is unavailable, try again later."
     assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
+
+
+# --- refund ---
+
+
+async def mark_paid(db_session, order_id: int, payment_intent: str = "pi_test_1") -> None:
+    """What the webhook does after a successful payment."""
+    order = await db_session.get(Order, order_id)
+    await db_session.refresh(order, ["items"])
+    order.status = OrderStatusEnum.paid
+    db_session.add(
+        Payment(
+            user_id=order.user_id,
+            order_id=order.id,
+            amount=order.total_amount,
+            external_payment_id=payment_intent,
+            items=[],
+        )
+    )
+    await db_session.commit()
+
+
+async def test_refund_returns_the_money_and_cancels_the_order(
+    client, db_session, catalog, alice, payment_gateway, email_sender
+):
+    matrix = catalog["The Matrix"]
+    order = await place_order(client, alice, matrix)
+    await mark_paid(db_session, order["id"], "pi_test_1")
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "canceled"
+    assert payment_gateway.refunds == ["pi_test_1"]
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.canceled
+    payment = await db_session.scalar(select(Payment).execution_options(populate_existing=True))
+    assert payment.status == PaymentStatusEnum.refunded
+    assert email_sender.refund_emails == [(alice.email, settings.ORDERS_LINK_ENDPOINT)]
+    # A refunded movie is not purchased any more.
+    added = await client.post(CART_ITEMS_URL, json={"movie_id": matrix.id}, headers=alice.headers)
+    assert added.status_code == 201
+
+
+@pytest.mark.parametrize("status", [OrderStatusEnum.pending, OrderStatusEnum.canceled])
+async def test_refund_order_that_is_not_paid_gives_409(
+    client, db_session, catalog, alice, payment_gateway, email_sender, status
+):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await set_status(db_session, order["id"], status)
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Only paid orders can be refunded."
+    assert payment_gateway.refunds == []
+    assert email_sender.refund_emails == []
+
+
+async def test_refund_twice_gives_409(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await mark_paid(db_session, order["id"])
+    await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert payment_gateway.refunds == ["pi_test_1"]
+
+
+async def test_refund_other_users_order_gives_404(client, db_session, catalog, alice, bob, payment_gateway):
+    order = await place_order(client, bob, catalog["The Matrix"])
+    await mark_paid(db_session, order["id"])
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 404
+    assert payment_gateway.refunds == []
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.paid
+
+
+async def test_refund_when_stripe_fails_gives_502_and_keeps_the_order_paid(
+    client, db_session, catalog, alice, payment_gateway, email_sender
+):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await mark_paid(db_session, order["id"])
+    payment_gateway.fail = True
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 502
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.paid
+    payment = await db_session.scalar(select(Payment).execution_options(populate_existing=True))
+    assert payment.status == PaymentStatusEnum.successful
+    assert email_sender.refund_emails == []
 
 
 # --- purchased movies elsewhere ---
@@ -523,3 +705,14 @@ async def test_deleting_a_user_removes_their_orders_only(client, db_session, cat
 
     assert list(await db_session.scalars(select(Order.user_id))) == [bob.id]
     assert (await db_session.execute(select(func.count()).select_from(OrderItem))).scalar_one() == 1
+
+
+async def test_refund_needs_a_paid_order_even_with_a_payment(client, db_session, catalog, alice, payment_gateway):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await mark_paid(db_session, order["id"])
+    await set_status(db_session, order["id"], OrderStatusEnum.canceled)
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/refund", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert payment_gateway.refunds == []

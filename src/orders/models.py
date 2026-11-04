@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import DECIMAL, DateTime, ForeignKey, Index, UniqueConstraint, func
+from sqlalchemy import DECIMAL, DateTime, ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,8 @@ class Order(Base):
         SQLEnum(OrderStatusEnum), nullable=False, default=OrderStatusEnum.pending
     )
     total_amount: Mapped[Decimal] = mapped_column(DECIMAL(10, 2), nullable=False)
+    # The Stripe Checkout page opened last for this order; None when there is none or it expired.
+    checkout_session_id: Mapped[str | None] = mapped_column(String, nullable=True, unique=True)
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", order_by="OrderItem.id", cascade="all, delete-orphan", passive_deletes=True
     )

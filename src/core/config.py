@@ -70,12 +70,18 @@ class Settings(BaseSettings):
     PASSWORD_RESET_COMPLETE_TEMPLATE_NAME: str = "password_reset_complete.html"
     COMMENT_REPLY_TEMPLATE_NAME: str = "comment_reply.html"
     COMMENT_LIKE_TEMPLATE_NAME: str = "comment_like.html"
+    PAYMENT_SUCCESS_TEMPLATE_NAME: str = "payment_success.html"
+    PAYMENT_FAILED_TEMPLATE_NAME: str = "payment_failed.html"
+    REFUND_TEMPLATE_NAME: str = "refund.html"
     ACTIVATION_REQUEST_SUBJECT: str = "Account Activation"
     ACTIVATION_COMPLETE_SUBJECT: str = "Account Activated Successfully"
     PASSWORD_RESET_REQUEST_SUBJECT: str = "Password Reset Request"
     PASSWORD_RESET_COMPLETE_SUBJECT: str = "Your Password Has Been Successfully Reset"
     COMMENT_REPLY_SUBJECT: str = "New Reply to Your Comment"
     COMMENT_LIKE_SUBJECT: str = "Someone Liked Your Comment"
+    PAYMENT_SUCCESS_SUBJECT: str = "Payment Received"
+    PAYMENT_FAILED_SUBJECT: str = "Payment Was Not Completed"
+    REFUND_SUBJECT: str = "Your Payment Has Been Refunded"
 
     # --- File storage (S3 API: MinIO in docker-compose) ---
     S3_ENDPOINT_URL: str = "http://localhost:9000"
@@ -126,6 +132,14 @@ class Settings(BaseSettings):
     @property
     def LOGIN_LINK_ENDPOINT(self) -> str:
         return f"{self.FRONTEND_URL.rstrip('/')}/login"
+
+    @property
+    def PURCHASES_LINK_ENDPOINT(self) -> str:
+        return f"{self.FRONTEND_URL.rstrip('/')}/purchases"
+
+    @property
+    def ORDERS_LINK_ENDPOINT(self) -> str:
+        return f"{self.FRONTEND_URL.rstrip('/')}/orders"
 
 
 settings = Settings()

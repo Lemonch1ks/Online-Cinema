@@ -33,3 +33,12 @@ class QueuedEmailSender:
 
     async def send_comment_like_email(self, email: str, comment_link: str) -> None:
         await self._enqueue("comment_like", email, comment_link)
+
+    async def send_payment_success_email(self, email: str, purchases_link: str) -> None:
+        await self._enqueue("payment_success", email, purchases_link)
+
+    async def send_payment_failed_email(self, email: str, orders_link: str) -> None:
+        await self._enqueue("payment_failed", email, orders_link)
+
+    async def send_refund_email(self, email: str, orders_link: str) -> None:
+        await self._enqueue("refund", email, orders_link)

@@ -100,6 +100,12 @@ def make_sender(password: str = "secret", use_tls: bool = False) -> EmailSender:
         comment_like_email_template_name=settings.COMMENT_LIKE_TEMPLATE_NAME,
         comment_reply_email_subject=settings.COMMENT_REPLY_SUBJECT,
         comment_like_email_subject=settings.COMMENT_LIKE_SUBJECT,
+        payment_success_email_template_name=settings.PAYMENT_SUCCESS_TEMPLATE_NAME,
+        payment_failed_email_template_name=settings.PAYMENT_FAILED_TEMPLATE_NAME,
+        refund_email_template_name=settings.REFUND_TEMPLATE_NAME,
+        payment_success_email_subject=settings.PAYMENT_SUCCESS_SUBJECT,
+        payment_failed_email_subject=settings.PAYMENT_FAILED_SUBJECT,
+        refund_email_subject=settings.REFUND_SUBJECT,
     )
 
 
@@ -120,6 +126,9 @@ def sent_message():
         ("send_password_reset_complete_email", settings.PASSWORD_RESET_COMPLETE_SUBJECT, "Password Successfully Reset"),
         ("send_comment_reply_email", settings.COMMENT_REPLY_SUBJECT, "New Reply"),
         ("send_comment_like_email", settings.COMMENT_LIKE_SUBJECT, "Comment Liked"),
+        ("send_payment_success_email", settings.PAYMENT_SUCCESS_SUBJECT, "Payment Received"),
+        ("send_payment_failed_email", settings.PAYMENT_FAILED_SUBJECT, "Payment Not Completed"),
+        ("send_refund_email", settings.REFUND_SUBJECT, "Payment Refunded"),
     ],
 )
 async def test_email_is_rendered_and_sent(method, subject, title):

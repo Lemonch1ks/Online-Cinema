@@ -75,6 +75,8 @@ def test_login_link_points_to_frontend_login_page(frontend_url, expected):
     custom = make_settings(APP_BASE_URL="https://api.example", FRONTEND_URL=frontend_url)
 
     assert custom.LOGIN_LINK_ENDPOINT == expected
+    assert custom.PURCHASES_LINK_ENDPOINT == expected.replace("/login", "/purchases")
+    assert custom.ORDERS_LINK_ENDPOINT == expected.replace("/login", "/orders")
 
 
 def test_frontend_url_has_a_default():
