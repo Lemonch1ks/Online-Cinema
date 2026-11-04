@@ -35,6 +35,12 @@ class EmailSender:  # noqa: UP039
         comment_like_email_template_name: str,
         comment_reply_email_subject: str,
         comment_like_email_subject: str,
+        payment_success_email_template_name: str,
+        payment_failed_email_template_name: str,
+        refund_email_template_name: str,
+        payment_success_email_subject: str,
+        payment_failed_email_subject: str,
+        refund_email_subject: str,
     ):
         self._hostname = hostname
         self._port = port
@@ -53,6 +59,12 @@ class EmailSender:  # noqa: UP039
         self._comment_like_email_template_name = comment_like_email_template_name
         self._comment_reply_email_subject = comment_reply_email_subject
         self._comment_like_email_subject = comment_like_email_subject
+        self._payment_success_email_template_name = payment_success_email_template_name
+        self._payment_failed_email_template_name = payment_failed_email_template_name
+        self._refund_email_template_name = refund_email_template_name
+        self._payment_success_email_subject = payment_success_email_subject
+        self._payment_failed_email_subject = payment_failed_email_subject
+        self._refund_email_subject = refund_email_subject
 
         self._env = Environment(loader=FileSystemLoader(template_dir))
 
@@ -146,3 +158,23 @@ class EmailSender:  # noqa: UP039
         template = self._env.get_template(self._comment_like_email_template_name)
         html_content = template.render(email=email, comment_link=comment_link)
         await self._send_email(email, self._comment_like_email_subject, html_content)
+
+    async def _send_with_link(self, template_name: str, subject: str, email: str, link: str) -> None:
+        html_content = self._env.get_template(template_name).render(email=email, link=link)
+        await self._send_email(email, subject, html_content)
+
+    async def send_payment_success_email(self, email: str, purchases_link: str) -> None:
+        """Confirm a successful payment; the link leads to the purchased movies."""
+        await self._send_with_link(
+            self._payment_success_email_template_name, self._payment_success_email_subject, email, purchases_link
+        )
+
+    async def send_payment_failed_email(self, email: str, orders_link: str) -> None:
+        """Tell the user the payment did not go through and suggest another payment method."""
+        await self._send_with_link(
+            self._payment_failed_email_template_name, self._payment_failed_email_subject, email, orders_link
+        )
+
+    async def send_refund_email(self, email: str, orders_link: str) -> None:
+        """Confirm that the money for an order was returned."""
+        await self._send_with_link(self._refund_email_template_name, self._refund_email_subject, email, orders_link)

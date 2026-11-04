@@ -32,6 +32,10 @@ REQUIRED_SETTINGS = {
     "EMAIL_USE_TLS": False,
     "S3_ACCESS_KEY": "key",
     "S3_SECRET_KEY": "secret",
+    "STRIPE_SECRET_KEY": "sk_test_x",
+    "STRIPE_WEBHOOK_SECRET": "whsec_x",
+    "STRIPE_SUCCESS_URL": "http://test/success",
+    "STRIPE_CANCEL_URL": "http://test/cancel",
 }
 
 
@@ -71,6 +75,8 @@ def test_login_link_points_to_frontend_login_page(frontend_url, expected):
     custom = make_settings(APP_BASE_URL="https://api.example", FRONTEND_URL=frontend_url)
 
     assert custom.LOGIN_LINK_ENDPOINT == expected
+    assert custom.PURCHASES_LINK_ENDPOINT == expected.replace("/login", "/purchases")
+    assert custom.ORDERS_LINK_ENDPOINT == expected.replace("/login", "/orders")
 
 
 def test_frontend_url_has_a_default():

@@ -18,6 +18,9 @@ METHODS = {
     "send_password_reset_complete_email": "password_reset_complete",
     "send_comment_reply_email": "comment_reply",
     "send_comment_like_email": "comment_like",
+    "send_payment_success_email": "payment_success",
+    "send_payment_failed_email": "payment_failed",
+    "send_refund_email": "refund",
 }
 
 
@@ -144,6 +147,9 @@ def test_smtp_sender_is_built_from_settings_and_cached():
         sender._password_complete_email_template_name,
         sender._comment_reply_email_template_name,
         sender._comment_like_email_template_name,
+        sender._payment_success_email_template_name,
+        sender._payment_failed_email_template_name,
+        sender._refund_email_template_name,
     ) == (
         settings.ACTIVATION_REQUEST_TEMPLATE_NAME,
         settings.ACTIVATION_COMPLETE_TEMPLATE_NAME,
@@ -151,6 +157,9 @@ def test_smtp_sender_is_built_from_settings_and_cached():
         settings.PASSWORD_RESET_COMPLETE_TEMPLATE_NAME,
         settings.COMMENT_REPLY_TEMPLATE_NAME,
         settings.COMMENT_LIKE_TEMPLATE_NAME,
+        settings.PAYMENT_SUCCESS_TEMPLATE_NAME,
+        settings.PAYMENT_FAILED_TEMPLATE_NAME,
+        settings.REFUND_TEMPLATE_NAME,
     )
     assert (
         sender._activation_email_subject,
@@ -159,6 +168,9 @@ def test_smtp_sender_is_built_from_settings_and_cached():
         sender._password_complete_email_subject,
         sender._comment_reply_email_subject,
         sender._comment_like_email_subject,
+        sender._payment_success_email_subject,
+        sender._payment_failed_email_subject,
+        sender._refund_email_subject,
     ) == (
         settings.ACTIVATION_REQUEST_SUBJECT,
         settings.ACTIVATION_COMPLETE_SUBJECT,
@@ -166,6 +178,9 @@ def test_smtp_sender_is_built_from_settings_and_cached():
         settings.PASSWORD_RESET_COMPLETE_SUBJECT,
         settings.COMMENT_REPLY_SUBJECT,
         settings.COMMENT_LIKE_SUBJECT,
+        settings.PAYMENT_SUCCESS_SUBJECT,
+        settings.PAYMENT_FAILED_SUBJECT,
+        settings.REFUND_SUBJECT,
     )
     assert email_tasks.get_smtp_sender() is sender
 

@@ -47,14 +47,23 @@ class OrderListResponseSchema(BaseModel):
     total_items: int
 
 
-class OrdersQuery(BasePagination):
-    user_id: int | None = Field(None, description="Orders of this user only")
-    status: OrderStatusEnum | None = Field(None, description="Orders with this status only")
-    date_from: date | None = Field(None, description="Orders created on this day (UTC) or later")
-    date_to: date | None = Field(None, description="Orders created on this day (UTC) or earlier")
+class AdminListQuery(BasePagination):
+    """Filters shared by the admin lists of orders and payments."""
+
+    user_id: int | None = Field(None, description="Records of this user only")
+    date_from: date | None = Field(None, description="Created on this day (UTC) or later")
+    date_to: date | None = Field(None, description="Created on this day (UTC) or earlier")
 
     @model_validator(mode="after")
     def check_dates(self) -> Self:
         if self.date_from is not None and self.date_to is not None and self.date_from > self.date_to:
             raise ValueError("date_from must not be later than date_to")
         return self
+
+
+class OrdersQuery(AdminListQuery):
+    status: OrderStatusEnum | None = Field(None, description="Orders with this status only")
+
+
+class CheckoutResponseSchema(BaseModel):
+    checkout_url: str = Field(description="Stripe Checkout page; open it to pay for the order")
