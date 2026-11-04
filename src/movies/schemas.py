@@ -1,8 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Self
 from uuid import UUID
 
-from pydantic import AfterValidator, BaseModel, Field, StringConstraints, model_validator
+from pydantic import AfterValidator, BaseModel, Field, StrictBool, StringConstraints, model_validator
 
 
 class SideSchema(BaseModel):
@@ -64,6 +65,10 @@ class MovieDetailItemSchema(MovieBaseSchema):
     genres: list[GenreSchema]
     directors: list[DirectorSchema]
     stars: list[StarSchema]
+    likes: int = 0
+    dislikes: int = 0
+    rating_avg: float | None = None
+    rating_count: int = 0
 
 
 def unique_names(names: list[str]) -> list[str]:
@@ -180,3 +185,57 @@ class StarDetailSchema(GenreDetailItemSchema):
 
 class DirectorDetailSchema(GenreDetailItemSchema):
     pass
+
+
+class FavoriteSchema(BaseModel):
+    movie_id: int
+
+
+class ReactionInSchema(BaseModel):
+    is_like: StrictBool
+
+    model_config = {"extra": "forbid"}
+
+
+class ReactionSchema(BaseModel):
+    movie_id: int
+    is_like: bool
+
+
+class RatingInSchema(BaseModel):
+    score: int = Field(ge=1, le=10)
+
+    model_config = {"extra": "forbid"}
+
+
+class RatingSchema(BaseModel):
+    movie_id: int
+    score: int
+
+
+CommentText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
+
+
+class CommentInSchema(BaseModel):
+    text: CommentText
+    parent_id: int | None = None
+
+    model_config = {"extra": "forbid"}
+
+
+class CommentSchema(BaseModel):
+    id: int
+    movie_id: int
+    author_id: int
+    parent_id: int | None
+    text: str
+    created_at: datetime
+    likes_count: int
+
+
+class CommentWithRepliesSchema(CommentSchema):
+    replies: list[CommentSchema]
+
+
+class CommentListResponseSchema(PageSchema):
+    comments: list[CommentWithRepliesSchema]

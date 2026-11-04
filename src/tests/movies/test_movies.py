@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import update
 
 from src.core.config import settings
+from src.movies.filters import SortByEnum
 from src.movies.models import Movie, Star
 from src.tests.utils import MOVIES_URL
 
@@ -122,7 +123,7 @@ async def test_movies_page_out_of_range_returns_empty_page(client, catalog):
         {"per_page": settings.PAGINATION_MAX_PER_PAGE + 1},
         {"imdb_from": -1},
         {"year_to": "last-year"},
-        {"sort_by": "price"},
+        {"sort_by": "title"},
         {"order_type": "random"},
         {"search_param": ""},
         {"unknown_param": "x"},
@@ -189,6 +190,8 @@ async def test_movies_filter_without_matches_returns_empty_page(client, catalog)
         ({"sort_by": "imdb", "order_type": "desc"}, ["Forrest Gump", "The Matrix", "Inception", "Cast Away"]),
         ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception"]),
         ({"sort_by": "gross", "order_type": "desc"}, ["Forrest Gump", "Inception", "Cast Away", "The Matrix"]),
+        ({"sort_by": "price"}, ["Cast Away", "The Matrix", "Inception", "Forrest Gump"]),
+        ({"sort_by": "price", "order_type": "asc"}, ["Forrest Gump", "Inception", "The Matrix", "Cast Away"]),
         ({"order_type": "asc"}, ["The Matrix", "Forrest Gump", "Cast Away", "Inception"]),
     ],
 )
@@ -196,6 +199,15 @@ async def test_movies_sorting(client, catalog, params, expected):
     response = await client.get(MOVIES_URL, params=params)
 
     assert names(response) == expected
+
+
+@pytest.mark.parametrize("sort_by", list(SortByEnum))
+@pytest.mark.parametrize("order_type", ["asc", "desc"])
+async def test_every_sort_option_is_supported(client, catalog, sort_by, order_type):
+    response = await client.get(MOVIES_URL, params={"sort_by": sort_by.value, "order_type": order_type})
+
+    assert response.status_code == 200, response.text
+    assert sorted(names(response)) == sorted(catalog)
 
 
 @pytest.fixture()

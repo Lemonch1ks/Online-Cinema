@@ -2,11 +2,11 @@ from enum import Enum
 from typing import Self
 
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import Select, asc, desc
+from sqlalchemy import Select, asc, desc, func, select
 from sqlalchemy.sql import or_
 
 from src.core.config import settings
-from src.movies.models import Director, Movie, Star
+from src.movies.models import Director, Movie, MovieReaction, Star
 
 
 class BasePagination(BaseModel):
@@ -75,6 +75,8 @@ class SortByEnum(str, Enum):
     meta_score = "meta_score"
     year = "year"
     gross = "gross"
+    price = "price"
+    popularity = "popularity"
 
 
 class MovieSort(BaseModel):
@@ -88,9 +90,20 @@ class MovieSort(BaseModel):
             SortByEnum.meta_score: Movie.meta_score,
             SortByEnum.year: Movie.year,
             SortByEnum.gross: Movie.gross,
+            SortByEnum.price: Movie.price,
         }
 
         order = {OrderTypeEnum.desc: desc, OrderTypeEnum.asc: asc}
+
+        if self.sort_by is SortByEnum.popularity:
+            likes = (
+                select(MovieReaction.movie_id, func.count().label("likes"))
+                .where(MovieReaction.is_like.is_(True))
+                .group_by(MovieReaction.movie_id)
+                .subquery()
+            )
+            stmt = stmt.outerjoin(likes, likes.c.movie_id == Movie.id)
+            return stmt.order_by(order[self.order_type](func.coalesce(likes.c.likes, 0)))
 
         if self.sort_by is not None:
             return stmt.order_by(order[self.order_type](sort_types[self.sort_by]).nulls_last())

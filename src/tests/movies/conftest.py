@@ -1,14 +1,16 @@
+from dataclasses import dataclass
 from decimal import Decimal
 
 import pytest
 
 from src.auth.models import UserGroupEnum
 from src.movies.models import Certification, Director, Genre, Movie, Star
-from src.tests.utils import headers_for
+from src.tests.utils import bearer, create_user_in_group, headers_for, login
 
 MOVIES = [
     {
         "name": "The Matrix",
+        "price": "9.99",
         "year": 1999,
         "imdb": 8.7,
         "meta_score": 73,
@@ -20,6 +22,7 @@ MOVIES = [
     },
     {
         "name": "Forrest Gump",
+        "price": "4.99",
         "year": 1994,
         "imdb": 8.8,
         "meta_score": 82,
@@ -31,6 +34,7 @@ MOVIES = [
     },
     {
         "name": "Cast Away",
+        "price": "14.99",
         "year": 2000,
         "imdb": 7.8,
         "meta_score": 74,
@@ -42,6 +46,7 @@ MOVIES = [
     },
     {
         "name": "Inception",
+        "price": "7.49",
         "year": 2010,
         "imdb": 8.6,
         "meta_score": 84,
@@ -73,7 +78,7 @@ async def catalog(db_session) -> dict[str, Movie]:
             meta_score=data["meta_score"],
             gross=data["gross"],
             description=data["description"],
-            price=Decimal("9.99"),
+            price=Decimal(data["price"]),
             certification=certification,
             genres=[genres[name] for name in data["genres"]],
             stars=[stars.setdefault(name, Star(name=name)) for name in data["stars"]],
@@ -90,3 +95,27 @@ async def catalog(db_session) -> dict[str, Movie]:
 @pytest.fixture()
 async def moderator_headers(client, db_session) -> dict:
     return await headers_for(client, db_session, UserGroupEnum.MODERATOR, "moderator@example.com")
+
+
+@dataclass(frozen=True)
+class Member:
+    """A logged-in user: id for checks in the database, headers for requests."""
+
+    id: int
+    email: str
+    headers: dict
+
+
+async def make_member(client, db_session, email: str, group: UserGroupEnum = UserGroupEnum.USER) -> Member:
+    user = await create_user_in_group(db_session, email, group)
+    return Member(user.id, email, bearer((await login(client, email))["access_token"]))
+
+
+@pytest.fixture()
+async def alice(client, db_session) -> Member:
+    return await make_member(client, db_session, "alice@example.com")
+
+
+@pytest.fixture()
+async def bob(client, db_session) -> Member:
+    return await make_member(client, db_session, "bob@example.com")

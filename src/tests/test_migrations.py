@@ -42,6 +42,13 @@ def test_upgrade_downgrade_upgrade_cycle(empty_database):
 
     alembic(empty_database, ("upgrade", "head"))
     assert query(empty_database, "select count(*) from user_groups") == [3]
+    assert set(query(empty_database, USER_TABLES)) >= {
+        "favorites",
+        "movie_reactions",
+        "movie_ratings",
+        "comments",
+        "comment_likes",
+    }
 
 
 def test_downgrade_refuses_to_remove_groups_that_users_belong_to(empty_database):
@@ -55,11 +62,12 @@ def test_downgrade_refuses_to_remove_groups_that_users_belong_to(empty_database)
             )
         )
     engine.dispose()
+    head = query(empty_database, "select version_num from alembic_version")
 
     with pytest.raises(RuntimeError, match="users"):
         alembic(empty_database, ("downgrade", "base"))
 
-    assert query(empty_database, "select version_num from alembic_version") == ["5b1c7e9d2a40"]
+    assert query(empty_database, "select version_num from alembic_version") == head
     assert query(empty_database, "select count(*) from user_groups") == [3]
     assert query(empty_database, "select email from users") == ["kept@example.com"]
 

@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -12,11 +12,10 @@ from src.movies.models import Certification, Director, Genre, Movie, Star
 from src.movies.schemas import (
     MovieCreationSchema,
     MovieDetailItemSchema,
-    MovieListItemSchema,
     MovieListResponseSchema,
     MovieUpdateSchema,
 )
-from src.movies.service import commit_or_409, get_or_create_by_names
+from src.movies.service import commit_or_409, get_movies_page, get_or_create_by_names, movie_details
 
 router = APIRouter()
 
@@ -40,41 +39,7 @@ async def get_movies(
     query_params: Annotated[MoviesQuery, Query()],
     db: AsyncSession = Depends(get_db),
 ) -> MovieListResponseSchema:
-
-    page = query_params.page
-    per_page = query_params.per_page
-
-    stmt = select(Movie)
-
-    stmt = query_params.search(stmt)
-    stmt = query_params.filter(stmt)
-
-    offset = (page - 1) * per_page
-
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    result_count = await db.execute(count_stmt)
-    total_items = result_count.scalar() or 0
-
-    stmt = query_params.sort(stmt)
-
-    items = await db.execute(stmt.order_by(Movie.id).offset(offset).limit(per_page))
-    movies = items.scalars().all()
-
-    total_pages = (total_items + per_page - 1) // per_page
-
-    movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
-
-    def page_link(page_number: int) -> str:
-        url = request.url.include_query_params(page=page_number, per_page=per_page)
-        return f"{url.path}?{url.query}"
-
-    return MovieListResponseSchema(
-        movies=movie_list,
-        prev_page=page_link(page - 1) if page > 1 else None,
-        next_page=page_link(page + 1) if page < total_pages else None,
-        total_pages=total_pages,
-        total_items=total_items,
-    )
+    return await get_movies_page(db, request, select(Movie), query_params)
 
 
 NOT_FOUND_RESPONSE = {
@@ -114,7 +79,7 @@ async def get_movie_details(
     db: AsyncSession = Depends(get_db),
 ) -> MovieDetailItemSchema:
     movie = await get_movie_or_404(db, movie_id)
-    return MovieDetailItemSchema.model_validate(movie)
+    return await movie_details(db, movie)
 
 
 @router.post(
@@ -145,7 +110,7 @@ async def create_movie(
     db.add(movie)
     await commit_or_409(db, DUPLICATE_MOVIE_DETAIL)
 
-    return MovieDetailItemSchema.model_validate(movie)
+    return await movie_details(db, movie)
 
 
 @router.patch(
@@ -177,7 +142,7 @@ async def update_movie(
         setattr(movie, field, value)
     await commit_or_409(db, DUPLICATE_MOVIE_DETAIL)
 
-    return MovieDetailItemSchema.model_validate(movie)
+    return await movie_details(db, movie)
 
 
 @router.delete(

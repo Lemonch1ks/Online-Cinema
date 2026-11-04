@@ -1,7 +1,25 @@
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from sqlalchemy import DECIMAL, Column, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint, Uuid
+from sqlalchemy import (
+    DECIMAL,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    SmallInteger,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -83,3 +101,55 @@ class Director(Base):
     movies: Mapped[list["Movie"]] = relationship(
         secondary=movie_directors_table, back_populates="directors", order_by="Movie.id"
     )
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+    __table_args__ = (Index("ix_favorites_movie_id", "movie_id"),)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class MovieReaction(Base):
+    """A like (is_like=True) or a dislike (is_like=False); the primary key allows only one per user and movie."""
+
+    __tablename__ = "movie_reactions"
+    __table_args__ = (Index("ix_movie_reactions_movie_id", "movie_id"),)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    is_like: Mapped[bool] = mapped_column(Boolean, nullable=False)
+
+
+class MovieRating(Base):
+    __tablename__ = "movie_ratings"
+    __table_args__ = (
+        CheckConstraint("score BETWEEN 1 AND 10", name="movie_ratings_score_range"),
+        Index("ix_movie_ratings_movie_id", "movie_id"),
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+    score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+
+class Comment(Base):
+    """A comment on a movie; a reply has parent_id of a top-level comment (only one level of replies)."""
+
+    __tablename__ = "comments"
+    __table_args__ = (
+        Index("ix_comments_movie_id_parent_id", "movie_id", "parent_id"),
+        Index("ix_comments_parent_id", "parent_id"),
+    )
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class CommentLike(Base):
+    __tablename__ = "comment_likes"
+    __table_args__ = (Index("ix_comment_likes_comment_id", "comment_id"),)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    comment_id: Mapped[int] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), primary_key=True)

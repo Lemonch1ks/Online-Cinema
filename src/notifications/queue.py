@@ -27,3 +27,9 @@ class QueuedEmailSender:
 
     async def send_password_reset_complete_email(self, email: str, login_link: str) -> None:
         await self._enqueue("password_reset_complete", email, login_link)
+
+    async def send_comment_reply_email(self, email: str, comment_link: str) -> None:
+        await self._enqueue("comment_reply", email, comment_link)
+
+    async def send_comment_like_email(self, email: str, comment_link: str) -> None:
+        await self._enqueue("comment_like", email, comment_link)

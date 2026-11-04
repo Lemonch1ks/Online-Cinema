@@ -63,10 +63,14 @@ class Settings(BaseSettings):
     ACTIVATION_REQUEST_TEMPLATE_NAME: str = "activation_request.html"
     PASSWORD_RESET_REQUEST_TEMPLATE_NAME: str = "password_reset_request.html"
     PASSWORD_RESET_COMPLETE_TEMPLATE_NAME: str = "password_reset_complete.html"
+    COMMENT_REPLY_TEMPLATE_NAME: str = "comment_reply.html"
+    COMMENT_LIKE_TEMPLATE_NAME: str = "comment_like.html"
     ACTIVATION_REQUEST_SUBJECT: str = "Account Activation"
     ACTIVATION_COMPLETE_SUBJECT: str = "Account Activated Successfully"
     PASSWORD_RESET_REQUEST_SUBJECT: str = "Password Reset Request"
     PASSWORD_RESET_COMPLETE_SUBJECT: str = "Your Password Has Been Successfully Reset"
+    COMMENT_REPLY_SUBJECT: str = "New Reply to Your Comment"
+    COMMENT_LIKE_SUBJECT: str = "Someone Liked Your Comment"
 
     # --- File storage (S3 API: MinIO in docker-compose) ---
     S3_ENDPOINT_URL: str = "http://localhost:9000"
