@@ -138,12 +138,15 @@ The suite covers endpoints and error responses, validation and business rules, u
 
 ## CI/CD
 
-GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and pushes to `develop` and `main`:
+Two GitHub Actions workflows:
+
+**CI** (`.github/workflows/ci.yml`) runs on pull requests and pushes to `develop` and `main`:
 
 - **lint**: flake8, `ruff format --check`, mypy;
 - **tests**: pytest with coverage against a PostgreSQL service;
-- **docker**: checks the compose file and builds the image;
-- **deploy**: after a merge into `main`, once all checks pass, connects to the EC2 server over SSH, pulls `main`, runs `docker compose up -d --build` (the migrations job applies new migrations) and waits until the API answers.
+- **docker**: checks the compose file and builds the image.
+
+**CD** (`.github/workflows/cd.yml`) starts when CI finishes on `main` and deploys only if CI passed on a push (a merged pull request): it connects to the EC2 server over SSH, moves `main` to exactly the commit CI has checked, runs `docker compose up -d --build` (the migrations job applies new migrations) and waits until the API answers. It can also be started by hand: Actions → Deploy → Run workflow.
 
 ### Deploying to AWS EC2
 
