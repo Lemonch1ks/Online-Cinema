@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.cart.service import count_carts_with_movie
 from src.core.database import get_db
 from src.movies.dependencies import need_moderator
 from src.movies.filters import MoviesQuery
@@ -150,12 +151,23 @@ async def update_movie(
     dependencies=[need_moderator],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Movie",
-    responses={404: NOT_FOUND_RESPONSE},
+    description="A movie that is in users' carts is deleted only with `force=true`; it then disappears from the carts.",
+    responses={
+        404: NOT_FOUND_RESPONSE,
+        409: {"description": "The movie is in users' carts and `force` is not set."},
+    },
 )
 async def delete_movie(
     movie_id: int,
+    force: bool = False,
     db: AsyncSession = Depends(get_db),
 ) -> None:
     movie = await get_movie_or_404(db, movie_id)
+    carts = await count_carts_with_movie(db, movie_id)
+    if carts and not force:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"The movie is in {carts} users' carts. Pass force=true to delete it anyway.",
+        )
     await db.delete(movie)
     await db.commit()

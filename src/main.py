@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from src.auth.routers import router as auth_router
+from src.cart.routers import router as cart_router
 from src.core.config import settings
 from src.core.docs import router as docs_router
 from src.movies.routers import router as movies_router
@@ -16,4 +17,5 @@ app = FastAPI(
 
 app.include_router(auth_router)
 app.include_router(movies_router)
+app.include_router(cart_router, prefix=settings.API_VERSION_PREFIX, tags=["cart"])
 app.include_router(docs_router)

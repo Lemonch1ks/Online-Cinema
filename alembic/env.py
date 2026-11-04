@@ -3,6 +3,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 import src.auth.models  # noqa: F401  (register all models in Base.metadata)
+import src.cart.models  # noqa: F401
 import src.movies.models  # noqa: F401
 from alembic import context
 from src.core.config import settings
