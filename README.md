@@ -4,6 +4,18 @@ A REST API for an online cinema: users browse a movie catalog, put movies in a c
 
 Built with FastAPI and async SQLAlchemy on PostgreSQL, with Celery for emails and periodic jobs, MinIO for avatars, and Stripe Checkout for payments. Everything runs with one `docker compose` command.
 
+## Live demo
+
+The API runs on AWS EC2: **http://13.60.187.41:8000/api/v1/docs**
+
+The docs ask for a login (HTTP Basic). Use the demo account, a regular user:
+
+| Email | Password |
+|---|---|
+| `demo@example.com` | `DemoCinema1!` |
+
+In Swagger, press **Authorize** and log in with the same email (as `username`) and password to call the endpoints. Payments run in Stripe test mode: pay with the card `4242 4242 4242 4242`, any future date and any CVC; no real money is charged. The demo account and its data may be reset at any time.
+
 ## Stack
 
 | Area | Tools |
