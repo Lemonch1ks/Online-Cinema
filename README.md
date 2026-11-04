@@ -6,7 +6,7 @@ Built with FastAPI and async SQLAlchemy on PostgreSQL, with Celery for emails an
 
 ## Live demo
 
-The API runs on AWS EC2: **http://13.60.187.41:8000/api/v1/docs**
+The API runs on AWS EC2: **http://13.63.115.21:8000/api/v1/docs**
 
 The docs ask for a login (HTTP Basic). Use the demo account, a regular user:
 
