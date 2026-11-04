@@ -83,6 +83,8 @@ services:
 
   migrations:
     image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
     <<: *app-env
     command:
       "alembic upgrade head"
@@ -92,6 +94,8 @@ services:
 
   celery_worker:
     image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
     <<: *app-env
     command: celery -A src.tasks worker --loglevel=info --concurrency=2
     depends_on:
@@ -102,6 +106,8 @@ services:
 
   celery_beat:
     image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
     <<: *app-env
     command: celery -A src.tasks beat --loglevel=info --schedule /tmp/celerybeat-schedule
     depends_on:
