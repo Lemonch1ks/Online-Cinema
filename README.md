@@ -101,6 +101,14 @@ This starts PostgreSQL, Redis, MinIO, Mailpit, the migrations job, the API, the 
 
 To get a first account: register through `POST /api/v1/users/register` and open the activation link from Mailpit.
 
+To fill an empty catalog with demo movies (with genres, stars, directors and certifications):
+
+```bash
+docker compose exec app python -m src.movies.seed
+```
+
+It can be run again: movies that are already there are skipped, existing genres and people are reused.
+
 ### Payments locally
 
 1. Take the test keys in the Stripe Dashboard → Developers → API keys and put the secret key in `STRIPE_SECRET_KEY`.
