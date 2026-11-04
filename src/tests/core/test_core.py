@@ -32,6 +32,10 @@ REQUIRED_SETTINGS = {
     "EMAIL_USE_TLS": False,
     "S3_ACCESS_KEY": "key",
     "S3_SECRET_KEY": "secret",
+    "STRIPE_SECRET_KEY": "sk_test_x",
+    "STRIPE_WEBHOOK_SECRET": "whsec_x",
+    "STRIPE_SUCCESS_URL": "http://test/success",
+    "STRIPE_CANCEL_URL": "http://test/cancel",
 }
 
 

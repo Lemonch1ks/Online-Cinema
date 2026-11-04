@@ -6,6 +6,7 @@ from src.core.config import settings
 from src.core.docs import router as docs_router
 from src.movies.routers import router as movies_router
 from src.orders.routers import router as orders_router
+from src.payments.routers import router as payments_router
 
 app = FastAPI(
     title=settings.APP_TITLE,
@@ -21,3 +22,4 @@ app.include_router(movies_router)
 app.include_router(cart_router, prefix=settings.API_VERSION_PREFIX, tags=["cart"])
 app.include_router(orders_router, prefix=settings.API_VERSION_PREFIX, tags=["orders"])
 app.include_router(docs_router)
+app.include_router(payments_router, prefix=settings.API_VERSION_PREFIX, tags=["payments"])

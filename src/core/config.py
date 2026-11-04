@@ -28,8 +28,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
 
-    # --- Celery ---
+    # --- Stripe ---
+    STRIPE_SECRET_KEY: str
+    STRIPE_WEBHOOK_SECRET: str
+    STRIPE_SUCCESS_URL: str
+    STRIPE_CANCEL_URL: str
 
+    # --- Celery ---
     BROKER_URL: str = "redis://localhost:6379"
 
     # --- Auth: JWT and tokens ---

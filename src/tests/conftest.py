@@ -13,6 +13,8 @@ from src.core.config import settings
 from src.core.database import Base, get_db
 from src.main import app
 from src.notifications.dependencies import get_email_sender
+from src.payments.dependencies import get_payment_gateway
+from src.payments.gateway import CheckoutItem, CheckoutSession, PaymentGatewayError
 from src.storage.dependencies import get_storage
 from src.storage.s3 import StorageError
 from src.tests.db import alembic, create_database, drop_database, with_database
@@ -123,9 +125,33 @@ def storage() -> FakeStorage:
     return FakeStorage()
 
 
+class FakePaymentGateway:
+    """In-memory replacement of StripeGateway. Set fail to simulate a Stripe outage or rejection."""
+
+    def __init__(self) -> None:
+        self.sessions: list[tuple[int, list[CheckoutItem], CheckoutSession]] = []
+        self.fail = False
+
+    async def create_checkout_session(self, order_id: int, items: list[CheckoutItem]) -> CheckoutSession:
+        if self.fail:
+            raise PaymentGatewayError("stripe is down")
+        session_id = f"cs_test_fake_{len(self.sessions) + 1}"
+        session = CheckoutSession(id=session_id, url=f"https://checkout.stripe.test/c/pay/{session_id}")
+        self.sessions.append((order_id, list(items), session))
+        return session
+
+
+@pytest.fixture()
+def payment_gateway() -> FakePaymentGateway:
+    return FakePaymentGateway()
+
+
 @pytest_asyncio.fixture()
 async def client(
-    email_sender: FakeEmailSender, storage: FakeStorage, session_factory: async_sessionmaker[AsyncSession]
+    email_sender: FakeEmailSender,
+    storage: FakeStorage,
+    payment_gateway: FakePaymentGateway,
+    session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncGenerator[AsyncClient]:
     async def override_get_db() -> AsyncGenerator[AsyncSession]:
         async with session_factory() as session:
@@ -134,6 +160,7 @@ async def client(
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_email_sender] = lambda: email_sender
     app.dependency_overrides[get_storage] = lambda: storage
+    app.dependency_overrides[get_payment_gateway] = lambda: payment_gateway
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac_client:
         yield ac_client
     app.dependency_overrides.clear()

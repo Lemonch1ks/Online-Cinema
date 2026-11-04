@@ -75,6 +75,10 @@ jobs:
       EMAIL_USE_TLS: "false"
       S3_ACCESS_KEY: ci-access-key
       S3_SECRET_KEY: ci-secret-key
+      STRIPE_SECRET_KEY: sk_test_ci_not_a_real_key
+      STRIPE_WEBHOOK_SECRET: whsec_ci_not_a_real_secret
+      STRIPE_SUCCESS_URL: http://test/success?session_id={CHECKOUT_SESSION_ID}
+      STRIPE_CANCEL_URL: http://test/cancel
     steps:
       - uses: actions/checkout@v4
 
