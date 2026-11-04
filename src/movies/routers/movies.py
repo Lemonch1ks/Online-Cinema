@@ -17,6 +17,7 @@ from src.movies.schemas import (
     MovieUpdateSchema,
 )
 from src.movies.service import commit_or_409, get_movies_page, get_or_create_by_names, movie_details
+from src.orders.services import count_orders_with_movie
 
 router = APIRouter()
 
@@ -151,10 +152,13 @@ async def update_movie(
     dependencies=[need_moderator],
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete Movie",
-    description="A movie that is in users' carts is deleted only with `force=true`; it then disappears from the carts.",
+    description=(
+        "A movie that is in any order cannot be deleted. "
+        "A movie that is in users' carts is deleted only with `force=true`; it then disappears from the carts."
+    ),
     responses={
         404: NOT_FOUND_RESPONSE,
-        409: {"description": "The movie is in users' carts and `force` is not set."},
+        409: {"description": "The movie is in orders, or in users' carts and `force` is not set."},
     },
 )
 async def delete_movie(
@@ -163,6 +167,11 @@ async def delete_movie(
     db: AsyncSession = Depends(get_db),
 ) -> None:
     movie = await get_movie_or_404(db, movie_id)
+    orders = await count_orders_with_movie(db, movie_id)
+    if orders:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=f"The movie is in {orders} orders and cannot be deleted."
+        )
     carts = await count_carts_with_movie(db, movie_id)
     if carts and not force:
         raise HTTPException(

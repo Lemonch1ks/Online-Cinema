@@ -50,6 +50,8 @@ def test_upgrade_downgrade_upgrade_cycle(empty_database):
         "comment_likes",
         "carts",
         "cart_items",
+        "orders",
+        "order_items",
     }
 
 

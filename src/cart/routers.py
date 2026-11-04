@@ -11,6 +11,8 @@ from src.cart.schemas import CartItemInSchema, CartItemSchema, CartSchema
 from src.cart.service import get_cart, get_cart_id, get_or_create_cart_id, item_schema
 from src.core.database import get_db
 from src.movies.models import Movie
+from src.orders.models import OrderStatusEnum
+from src.orders.services import movie_ids_in_orders
 
 router = APIRouter()
 
@@ -40,7 +42,7 @@ async def read_cart(
     summary="Add Movie to Cart",
     responses={
         404: MOVIE_NOT_FOUND_RESPONSE,
-        409: {"description": "The movie is already in the cart."},
+        409: {"description": "The movie is already in the cart or already purchased."},
     },
 )
 async def add_to_cart(
@@ -52,6 +54,10 @@ async def add_to_cart(
     movie = await db.scalar(stmt)
     if movie is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No movies with id:{data.movie_id} found.")
+    if movie.id in await movie_ids_in_orders(db, user.id, OrderStatusEnum.paid):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=f"Movie with id:{movie.id} is already purchased."
+        )
 
     cart_id = await get_or_create_cart_id(db, user.id)
     item = await db.scalar(
