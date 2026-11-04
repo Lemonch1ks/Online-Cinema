@@ -12,6 +12,7 @@ from src.core.database import get_db
 from src.movies.models import Movie
 from src.orders.models import Order, OrderItem, OrderStatusEnum
 from src.orders.schemas import (
+    CheckoutResponseSchema,
     ExcludedMovieSchema,
     ExclusionReasonEnum,
     OrderCreatedSchema,
@@ -20,6 +21,8 @@ from src.orders.schemas import (
     OrdersQuery,
 )
 from src.orders.services import filter_orders, movie_ids_in_orders, newest_first, order_schema, with_items
+from src.payments.dependencies import get_payment_gateway
+from src.payments.gateway import CheckoutItem, PaymentGatewayError, StripeGateway
 
 router = APIRouter()
 
@@ -158,3 +161,43 @@ async def list_all_orders(
         total_pages=total_pages,
         total_items=total_items,
     )
+
+
+@router.post(
+    "/orders/{order_id}/pay",
+    response_model=CheckoutResponseSchema,
+    summary="Pay for Order",
+    description=(
+        "Opens a Stripe Checkout page for a pending order of the current user and returns its url. "
+        "The order becomes paid only after Stripe confirms the payment through the webhook, "
+        "not when the user is redirected back."
+    ),
+    responses={
+        404: {"description": "No such order among the current user's orders."},
+        409: {"description": "The order is not pending: it is already paid or canceled."},
+        502: {"description": "Stripe is unavailable or rejected the request; nothing was charged, try again later."},
+    },
+)
+async def order_payment(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_active_user),
+    payment_gateway: StripeGateway = Depends(get_payment_gateway),
+) -> CheckoutResponseSchema:
+    order = await db.scalar(with_items(select(Order).where(Order.id == order_id, Order.user_id == user.id)))
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No orders with id:{order_id} found.")
+
+    if order.status != OrderStatusEnum.pending:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only pending orders can be paid.")
+
+    # The price is the one fixed in the order, not the current movie price.
+    items = [CheckoutItem(name=item.movie.name, price=item.price_at_order) for item in order.items]
+    try:
+        session = await payment_gateway.create_checkout_session(order_id=order.id, items=items)
+    except PaymentGatewayError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Payment provider is unavailable, try again later."
+        ) from None
+
+    return CheckoutResponseSchema(checkout_url=session.url)

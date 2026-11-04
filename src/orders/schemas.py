@@ -58,3 +58,7 @@ class OrdersQuery(BasePagination):
         if self.date_from is not None and self.date_to is not None and self.date_from > self.date_to:
             raise ValueError("date_from must not be later than date_to")
         return self
+
+
+class CheckoutResponseSchema(BaseModel):
+    checkout_url: str = Field(description="Stripe Checkout page; open it to pay for the order")

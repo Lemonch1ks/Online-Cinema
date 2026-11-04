@@ -10,6 +10,7 @@ from src.cart.models import Cart, CartItem
 from src.core.config import settings
 from src.movies.models import Movie
 from src.orders.models import Order, OrderItem, OrderStatusEnum
+from src.payments.gateway import CheckoutItem
 from src.tests.utils import MOVIES_URL, headers_for
 
 ORDERS_URL = f"{settings.API_VERSION_PREFIX}/orders"
@@ -62,9 +63,10 @@ async def test_anonymous_gets_401(client):
         await client.get(ORDERS_URL),
         await client.post(f"{ORDERS_URL}/1/cancel"),
         await client.get(ADMIN_ORDERS_URL),
+        await client.post(f"{ORDERS_URL}/1/pay"),
     ]
 
-    assert [response.status_code for response in responses] == [401] * 4
+    assert [response.status_code for response in responses] == [401] * 5
 
 
 # --- place an order ---
@@ -267,6 +269,85 @@ async def test_cancel_unknown_order_gives_404(client, alice):
     response = await client.post(f"{ORDERS_URL}/999999/cancel", headers=alice.headers)
 
     assert response.status_code == 404
+
+
+# --- pay ---
+
+
+async def order_status(db_session, order_id: int) -> OrderStatusEnum:
+    return (await db_session.get(Order, order_id, populate_existing=True)).status
+
+
+async def test_pay_opens_a_checkout_page_with_every_movie_of_the_order(
+    client, db_session, catalog, alice, payment_gateway
+):
+    order = await place_order(client, alice, catalog["The Matrix"], catalog["Inception"])
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 200
+    [(order_id, items, session)] = payment_gateway.sessions
+    assert response.json() == {"checkout_url": session.url}
+    assert order_id == order["id"]
+    assert items == [CheckoutItem("The Matrix", Decimal("9.99")), CheckoutItem("Inception", Decimal("7.49"))]
+    # The order is paid only when Stripe confirms the payment through the webhook.
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
+
+
+async def test_pay_charges_the_price_at_order_not_the_current_price(
+    client, db_session, catalog, alice, payment_gateway
+):
+    matrix = catalog["The Matrix"]
+    order = await place_order(client, alice, matrix)
+    await db_session.execute(update(Movie).where(Movie.id == matrix.id).values(price=Decimal("19.99")))
+    await db_session.commit()
+
+    await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    [(_, items, _)] = payment_gateway.sessions
+    assert items == [CheckoutItem("The Matrix", Decimal("9.99"))]
+
+
+@pytest.mark.parametrize("status", [OrderStatusEnum.paid, OrderStatusEnum.canceled])
+async def test_pay_for_order_that_is_not_pending_gives_409(client, db_session, catalog, alice, payment_gateway, status):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    await set_status(db_session, order["id"], status)
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Only pending orders can be paid."
+    assert payment_gateway.sessions == []
+
+
+async def test_pay_for_other_users_order_gives_404(client, db_session, catalog, alice, bob, payment_gateway):
+    order = await place_order(client, bob, catalog["The Matrix"])
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"No orders with id:{order['id']} found."
+    assert payment_gateway.sessions == []
+
+
+async def test_pay_for_unknown_order_gives_404(client, alice, payment_gateway):
+    response = await client.post(f"{ORDERS_URL}/999999/pay", headers=alice.headers)
+
+    assert response.status_code == 404
+    assert payment_gateway.sessions == []
+
+
+async def test_pay_when_stripe_fails_gives_502_and_order_stays_pending(
+    client, db_session, catalog, alice, payment_gateway
+):
+    order = await place_order(client, alice, catalog["The Matrix"])
+    payment_gateway.fail = True
+
+    response = await client.post(f"{ORDERS_URL}/{order['id']}/pay", headers=alice.headers)
+
+    assert response.status_code == 502
+    assert response.json()["detail"] == "Payment provider is unavailable, try again later."
+    assert await order_status(db_session, order["id"]) == OrderStatusEnum.pending
 
 
 # --- purchased movies elsewhere ---
