@@ -48,6 +48,8 @@ def test_upgrade_downgrade_upgrade_cycle(empty_database):
         "movie_ratings",
         "comments",
         "comment_likes",
+        "carts",
+        "cart_items",
     }
 
 
