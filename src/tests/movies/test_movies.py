@@ -1,0 +1,360 @@
+from decimal import Decimal
+
+import pytest
+from sqlalchemy import update
+
+from src.core.config import settings
+from src.movies.filters import SortByEnum
+from src.movies.models import Movie, Star
+from src.tests.utils import MOVIES_URL
+
+
+def names(response) -> list[str]:
+    return [movie["name"] for movie in response.json()["movies"]]
+
+
+# --- GET /movies: list and pagination ---
+
+EMPTY_PAGE = {"movies": [], "total_items": 0, "total_pages": 0, "prev_page": None, "next_page": None}
+
+
+async def test_movies_list_on_empty_db_returns_empty_page(client):
+    response = await client.get(MOVIES_URL)
+
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
+
+
+async def test_movies_list_returns_all_movies_ordered_by_id(client, catalog):
+    response = await client.get(MOVIES_URL)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert names(response) == ["The Matrix", "Forrest Gump", "Cast Away", "Inception"]
+    assert body["total_items"] == 4
+    assert body["total_pages"] == 1
+    assert body["prev_page"] is None
+    assert body["next_page"] is None
+    assert set(body["movies"][0]) == {"id", "name", "year", "time", "imdb", "votes", "description"}
+
+
+async def test_movies_pagination_first_and_last_page(client, catalog):
+    first = await client.get(MOVIES_URL, params={"page": 1, "per_page": 3})
+    last = await client.get(MOVIES_URL, params={"page": 2, "per_page": 3})
+
+    assert names(first) == ["The Matrix", "Forrest Gump", "Cast Away"]
+    assert first.json()["total_pages"] == 2
+    assert first.json()["prev_page"] is None
+    assert first.json()["next_page"] == f"{MOVIES_URL}?page=2&per_page=3"
+
+    assert names(last) == ["Inception"]
+    assert last.json()["prev_page"] == f"{MOVIES_URL}?page=1&per_page=3"
+    assert last.json()["next_page"] is None
+
+
+async def test_movies_pagination_when_items_divide_evenly(client, catalog):
+    first = await client.get(MOVIES_URL, params={"page": 1, "per_page": 2})
+    last = await client.get(MOVIES_URL, params={"page": 2, "per_page": 2})
+
+    assert first.json()["total_pages"] == 2
+    assert first.json()["next_page"] == f"{MOVIES_URL}?page=2&per_page=2"
+    assert names(last) == ["Cast Away", "Inception"]
+    assert last.json()["next_page"] is None
+
+
+async def test_movies_per_page_maximum_is_accepted(client, catalog):
+    response = await client.get(MOVIES_URL, params={"per_page": settings.PAGINATION_MAX_PER_PAGE})
+
+    assert response.status_code == 200
+
+
+def make_movie(catalog, name: str, year: int, **extra) -> Movie:
+    return Movie(
+        name=name,
+        year=year,
+        time=100,
+        imdb=7.0,
+        votes=10,
+        description=f"{name} description.",
+        price=Decimal("4.99"),
+        certification_id=catalog["The Matrix"].certification_id,
+        **extra,
+    )
+
+
+async def test_movies_are_ordered_by_id_even_with_ties_and_storage_order(client, db_session, catalog):
+    db_session.add(make_movie(catalog, "Twin of Matrix", 1999))
+    await db_session.commit()
+    matrix = catalog["The Matrix"]
+    await db_session.execute(update(Movie).where(Movie.id == matrix.id).values(votes=Movie.votes + 1))
+    await db_session.commit()
+
+    unsorted = await client.get(MOVIES_URL)
+    tied = await client.get(MOVIES_URL, params={"sort_by": "year", "order_type": "asc", "per_page": 3})
+
+    assert names(unsorted) == ["The Matrix", "Forrest Gump", "Cast Away", "Inception", "Twin of Matrix"]
+    assert names(tied) == ["Forrest Gump", "The Matrix", "Twin of Matrix"]
+
+
+async def test_movies_page_links_keep_filters(client, catalog):
+    response = await client.get(MOVIES_URL, params={"year_from": 1990, "page": 1, "per_page": 1})
+
+    assert response.json()["next_page"] == f"{MOVIES_URL}?year_from=1990&page=2&per_page=1"
+
+
+async def test_movies_page_out_of_range_returns_empty_page(client, catalog):
+    response = await client.get(MOVIES_URL, params={"page": 3, "per_page": 2})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "movies": [],
+        "total_items": 4,
+        "total_pages": 2,
+        "prev_page": f"{MOVIES_URL}?page=2&per_page=2",
+        "next_page": None,
+    }
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"page": 0},
+        {"per_page": 0},
+        {"per_page": settings.PAGINATION_MAX_PER_PAGE + 1},
+        {"imdb_from": -1},
+        {"year_to": "last-year"},
+        {"sort_by": "title"},
+        {"order_type": "random"},
+        {"search_param": ""},
+        {"unknown_param": "x"},
+        {"imdb_from": 8, "imdb_to": 5},
+        {"meta_score_from": 80, "meta_score_to": 70},
+        {"gross_from": 300, "gross_to": 100},
+        {"year_from": 2010, "year_to": 2000},
+        {"imdb_to": 11},
+    ],
+)
+async def test_movies_invalid_query_returns_422(client, catalog, params):
+    response = await client.get(MOVIES_URL, params=params)
+
+    assert response.status_code == 422
+
+
+# --- filters ---
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"imdb_from": 8.7}, {"The Matrix", "Forrest Gump"}),
+        ({"imdb_to": 7.8}, {"Cast Away"}),
+        ({"year_from": 2000}, {"Cast Away", "Inception"}),
+        ({"year_to": 1999}, {"The Matrix", "Forrest Gump"}),
+        ({"year_from": 1995, "year_to": 2005}, {"The Matrix", "Cast Away"}),
+        ({"meta_score_from": 82}, {"Forrest Gump", "Inception"}),
+        ({"meta_score_to": 74}, {"The Matrix", "Cast Away"}),
+        ({"gross_from": 292.6}, {"Forrest Gump", "Inception"}),
+        ({"gross_to": 171.5}, {"The Matrix"}),
+        ({"year_from": 1995, "imdb_from": 8.0}, {"The Matrix", "Inception"}),
+    ],
+)
+async def test_movies_filters(client, catalog, params, expected):
+    response = await client.get(MOVIES_URL, params=params)
+
+    assert response.status_code == 200
+    assert set(names(response)) == expected
+    assert response.json()["total_items"] == len(expected)
+
+
+async def test_movies_filter_with_equal_bounds(client, catalog):
+    response = await client.get(MOVIES_URL, params={"imdb_from": 8.7, "imdb_to": 8.7})
+
+    assert names(response) == ["The Matrix"]
+
+
+async def test_movies_filter_without_matches_returns_empty_page(client, catalog):
+    response = await client.get(MOVIES_URL, params={"year_from": 2020})
+
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
+
+
+# --- sorting ---
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"sort_by": "year"}, ["Inception", "Cast Away", "The Matrix", "Forrest Gump"]),
+        ({"sort_by": "year", "order_type": "asc"}, ["Forrest Gump", "The Matrix", "Cast Away", "Inception"]),
+        ({"sort_by": "imdb", "order_type": "desc"}, ["Forrest Gump", "The Matrix", "Inception", "Cast Away"]),
+        ({"sort_by": "meta_score", "order_type": "asc"}, ["The Matrix", "Cast Away", "Forrest Gump", "Inception"]),
+        ({"sort_by": "gross", "order_type": "desc"}, ["Forrest Gump", "Inception", "Cast Away", "The Matrix"]),
+        ({"sort_by": "price"}, ["Cast Away", "The Matrix", "Inception", "Forrest Gump"]),
+        ({"sort_by": "price", "order_type": "asc"}, ["Forrest Gump", "Inception", "The Matrix", "Cast Away"]),
+        ({"order_type": "asc"}, ["The Matrix", "Forrest Gump", "Cast Away", "Inception"]),
+    ],
+)
+async def test_movies_sorting(client, catalog, params, expected):
+    response = await client.get(MOVIES_URL, params=params)
+
+    assert names(response) == expected
+
+
+@pytest.mark.parametrize("sort_by", list(SortByEnum))
+@pytest.mark.parametrize("order_type", ["asc", "desc"])
+async def test_every_sort_option_is_supported(client, catalog, sort_by, order_type):
+    response = await client.get(MOVIES_URL, params={"sort_by": sort_by.value, "order_type": order_type})
+
+    assert response.status_code == 200, response.text
+    assert sorted(names(response)) == sorted(catalog)
+
+
+@pytest.fixture()
+async def movie_without_scores(db_session, catalog) -> Movie:
+    matrix = catalog["The Matrix"]
+    movie = Movie(
+        name="Unknown Indie",
+        year=2005,
+        time=90,
+        imdb=7.0,
+        votes=10,
+        meta_score=None,
+        gross=None,
+        description="No box office data.",
+        price=Decimal("1.99"),
+        certification_id=matrix.certification_id,
+    )
+    db_session.add(movie)
+    await db_session.commit()
+    return movie
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        (
+            {"sort_by": "meta_score", "order_type": "desc"},
+            ["Inception", "Forrest Gump", "Cast Away", "The Matrix", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "meta_score", "order_type": "asc"},
+            ["The Matrix", "Cast Away", "Forrest Gump", "Inception", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "gross", "order_type": "desc"},
+            ["Forrest Gump", "Inception", "Cast Away", "The Matrix", "Unknown Indie"],
+        ),
+        (
+            {"sort_by": "gross", "order_type": "asc"},
+            ["The Matrix", "Cast Away", "Inception", "Forrest Gump", "Unknown Indie"],
+        ),
+    ],
+)
+async def test_movies_sorting_puts_null_values_last(client, movie_without_scores, params, expected):
+    response = await client.get(MOVIES_URL, params=params)
+
+    assert names(response) == expected
+
+
+async def test_movies_range_filter_excludes_null_values(client, movie_without_scores):
+    response = await client.get(MOVIES_URL, params={"meta_score_to": 100})
+
+    assert "Unknown Indie" not in names(response)
+    assert response.json()["total_items"] == 4
+
+
+async def test_movies_sorting_applies_before_pagination(client, catalog):
+    response = await client.get(MOVIES_URL, params={"sort_by": "year", "page": 2, "per_page": 2})
+
+    assert names(response) == ["The Matrix", "Forrest Gump"]
+
+
+# --- search ---
+
+
+@pytest.mark.parametrize(
+    ("search", "expected"),
+    [
+        ("matrix", ["The Matrix"]),
+        ("island", ["Cast Away"]),
+        ("keanu", ["The Matrix"]),
+        ("zemeckis", ["Forrest Gump", "Cast Away"]),
+        ("  inception  ", ["Inception"]),
+        ("%", ["Inception"]),
+    ],
+)
+async def test_movies_search(client, catalog, search, expected):
+    response = await client.get(MOVIES_URL, params={"search_param": search})
+
+    assert response.status_code == 200
+    assert names(response) == expected
+    assert response.json()["total_items"] == len(expected)
+
+
+async def test_movies_search_without_matches_returns_empty_page(client, catalog):
+    response = await client.get(MOVIES_URL, params={"search_param": "star wars"})
+
+    assert response.status_code == 200
+    assert response.json() == EMPTY_PAGE
+
+
+async def test_movies_search_filter_and_sort_combined(client, catalog):
+    response = await client.get(
+        MOVIES_URL, params={"search_param": "tom hanks", "year_from": 1995, "sort_by": "year", "order_type": "desc"}
+    )
+
+    assert names(response) == ["Cast Away"]
+
+
+async def test_search_matching_several_stars_of_one_movie_returns_it_once(client, db_session, catalog):
+    db_session.add(make_movie(catalog, "Two Toms", 2012, stars=[Star(name="Tom Hardy"), Star(name="Tom Holland")]))
+    await db_session.commit()
+
+    response = await client.get(MOVIES_URL, params={"search_param": "tom h"})
+
+    assert names(response) == ["Forrest Gump", "Cast Away", "Two Toms"]
+    assert response.json()["total_items"] == 3
+
+
+# --- GET /movies/{movie_id} ---
+
+
+async def test_movie_details(client, catalog):
+    movie = catalog["The Matrix"]
+
+    response = await client.get(f"{MOVIES_URL}/{movie.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == movie.id
+    assert body["uuid"] == str(movie.uuid)
+    assert body["name"] == "The Matrix"
+    assert body["meta_score"] == 73
+    assert body["gross"] == 171.5
+    assert body["price"] == "9.99"
+    assert body["certification_id"] == movie.certification_id
+    assert [g["name"] for g in body["genres"]] == ["Action"]
+    assert [s["name"] for s in body["stars"]] == ["Keanu Reeves"]
+    assert [d["name"] for d in body["directors"]] == ["Lana Wachowski"]
+
+
+async def test_movie_details_unknown_id_returns_404(client, catalog):
+    response = await client.get(f"{MOVIES_URL}/9999")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "No movies with id:9999 found."
+
+
+async def test_movie_details_non_integer_id_returns_422(client):
+    response = await client.get(f"{MOVIES_URL}/abc")
+
+    assert response.status_code == 422
+
+
+async def test_movie_details_with_null_scores(client, movie_without_scores):
+    response = await client.get(f"{MOVIES_URL}/{movie_without_scores.id}")
+
+    assert response.status_code == 200
+    assert response.json()["meta_score"] is None
+    assert response.json()["gross"] is None

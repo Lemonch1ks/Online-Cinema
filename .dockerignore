@@ -1,0 +1,40 @@
+# Files that must not get into the build context / image.
+
+# Git and IDE
+.git
+.gitignore
+.idea
+.vscode
+
+# Local virtualenv: built for Windows, useless (and huge) inside a Linux image
+.venv
+venv
+
+# Secrets: passed to containers at runtime via env_file in docker-compose
+.env
+
+# Local SQLite database
+*.db
+
+# Python caches
+**/__pycache__
+**/*.py[cod]
+
+# Tests and coverage: dev group is not installed in the image
+src/tests
+.pytest_cache
+.coverage
+.coverage.*
+htmlcov
+
+# Celery beat state from local runs
+celerybeat-schedule*
+celerybeat.pid
+
+# Docker files themselves
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Notes for the AI assistant
+CLAUDE.md

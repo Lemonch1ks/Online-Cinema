@@ -1,0 +1,122 @@
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-cinema}:${POSTGRES_PASSWORD:-cinema}@db:5432/${POSTGRES_DB:-cinema}
+    BROKER_URL: redis://redis:6379/0
+    S3_ENDPOINT_URL: http://minio:9000
+    S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+    S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    S3_BUCKET: ${MINIO_BUCKET:-avatars}
+    EMAIL_HOSTNAME: mailpit
+    EMAIL_PORT: 1025
+    EMAIL_USE_TLS: "False"
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cinema}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cinema}
+      POSTGRES_DB: ${POSTGRES_DB:-cinema}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-avatars}:download
+      MINIO_BROWSER: "on"
+    volumes:
+      - minio_data:/bitnami/minio/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  app:
+    build: .
+    image: main_app
+    <<: *app-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+
+  migrations:
+    image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
+    <<: *app-env
+    command:
+      "alembic upgrade head"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  celery_worker:
+    image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
+    <<: *app-env
+    command: celery -A src.tasks worker --loglevel=info --concurrency=2
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+  celery_beat:
+    image: main_app
+    # Built by the app service, never pulled from a registry (it does not exist there).
+    pull_policy: never
+    <<: *app-env
+    command: celery -A src.tasks beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+
+
+volumes:
+  postgres_data:
+  minio_data:
