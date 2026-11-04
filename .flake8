@@ -1,0 +1,10 @@
+[flake8]
+# Same line length as `ruff format`, which formats the code (the black style).
+max-line-length = 120
+# E203: whitespace before ':' in slices is how the formatter writes them.
+# W503: the formatter puts binary operators at the start of a line.
+extend-ignore = E203, W503
+extend-exclude = .venv, alembic/versions, __pycache__
+per-file-ignores =
+    # Shared fixtures are re-exported so pytest finds them in these test packages.
+    src/tests/*/conftest.py: F401
